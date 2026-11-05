@@ -105,7 +105,7 @@ function updateChallengeHeader() {
   $("challengeTitle").textContent = level.name;
   $("objectiveText").textContent = "Support " + level.loadKN + " kN · ≤ " + level.maxDeflectionMM + " mm deflection";
   $("loadTarget").textContent = n(settings.targetLoad, 1) + " kN test";
-  playHUD?.setMetric("target", n(challenge.loadKN, 1) + " kN");
+  playHUD?.setMetric("target", n(level.loadKN, 1) + " kN");
 }
 
 function setMode(next) {

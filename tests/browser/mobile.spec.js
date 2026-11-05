@@ -1,9 +1,15 @@
 import { test, expect } from "@playwright/test";
 
 async function waitForLab(page) {
-  await page.goto("/");
-  await expect(page.locator("#sceneLoading")).toBeHidden({ timeout: 35_000 });
-  await expect(page.locator("#stressMetric")).not.toContainText("—");
+  const startupError = new Promise((_, reject) => {
+    page.once("pageerror", error => reject(new Error("Startup error: " + error.message)));
+  });
+  const loading = async () => {
+    await page.goto("/");
+    await expect(page.locator("#sceneLoading")).toBeHidden({ timeout: 35_000 });
+    await expect(page.locator("#stressMetric")).not.toContainText("—");
+  };
+  await Promise.race([startupError, loading()]);
 }
 
 test("scene remains visible; build, test and inspect work without page scrolling", async ({ page }, testInfo) => {
