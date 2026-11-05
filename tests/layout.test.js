@@ -32,3 +32,8 @@ test("HTML IDs are unique", () => {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(ids).size, ids.length);
 });
+
+test("PWA manifest uses the Vite base path for GitHub Pages", () => {
+  assert.match(html, /href="%BASE_URL%manifest\.webmanifest"/);
+  assert.doesNotMatch(html, /href="\/manifest\.webmanifest"/);
+});
