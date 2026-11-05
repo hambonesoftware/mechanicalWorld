@@ -108,7 +108,7 @@ function createDeformedStrip(length, h, width, centerY, config, mechanics, solut
   const positions = geometry.attributes.position;
   const colors = new Float32Array(positions.count * 3);
   const yieldStrength = mechanics.material.yieldStrength;
-  const visualOptions = { beamY: BEAM_Y, plasticVisual: damage?.plasticVisual || 0 };
+  const visualOptions = { beamY: BEAM_Y, plasticVisual: damage?.plasticVisual || 0, rotationAt: mechanics.rotationAt };
   for (let i = 0; i < positions.count; i += 1) {
     const x = clamp(positions.getX(i) + (rangeStart + rangeEnd) / 2, 0, length);
     const localY = positions.getY(i) + centerY;
@@ -310,7 +310,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     crackGroup.add(tube);
   }
 
-  function updateCrack(config, solution, damage) {
+  function updateCrack(config, mechanics, solution, damage) {
     const crackStep = Math.floor((damage.crackProgress + damage.tearProgress) * 18);
     if (crackStep === 0 && lastCrackStep === 0) return;
     lastCrackStep = crackStep;
@@ -322,7 +322,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     const topY = config.depth / 2 + 0.004;
     const depthZ = config.width / 2;
     const extend = 0.10 + damage.crackProgress * 0.90;
-    const options = { beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0 };
+    const options = { beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0, rotationAt: mechanics.rotationAt };
     const warp = (x, y, z) => {
       const point = beamVisualPoint(config, solution, x, y, options);
       return new THREE.Vector3(point.x, point.y, z);
@@ -510,7 +510,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
 
   function updateBeam(config, mechanics, solution, showHeatmap, damage = null) {
     lastConfig = { ...config };
-    const visual = { beamY: BEAM_Y, plasticVisual: damage?.plasticVisual || 0 };
+    const visual = { beamY: BEAM_Y, plasticVisual: damage?.plasticVisual || 0, rotationAt: mechanics.rotationAt };
     const tipPose = beamVisualPose(config, solution, config.length, visual);
     lastTipDeflection = tipPose.displacement;
     lastDisplayLowestY = Infinity;
@@ -524,7 +524,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     }
     if (fractureStarted) return { overstress: true, separated: true };
     beamGroup.visible = true;
-    updateCrack(config, solution, damage || { crackProgress: 0, tearProgress: 0 });
+    updateCrack(config, mechanics, solution, damage || { crackProgress: 0, tearProgress: 0 });
     const oldMeshes = [...stripMeshes];
     for (const mesh of oldMeshes) {
       beamGroup.remove(mesh);

@@ -53,3 +53,15 @@ test("elastic small load still appears 8x exaggerated and zero stays zero",()=>{
   const display=Math.abs(beamVisualPose(c,sol,c.length).displacement);
   assert.ok(display/raw>.95 && display/raw<=1.01);
 });
+
+test("elastic FEAScript displacement uses analytical rotation when FEM omits it",()=>{
+  const c={...STARTER};
+  const model={
+    displacementAt:x=>-0.004*x*x,
+    tipDeflectionM:-0.004*c.length*c.length
+  };
+  const pose=beamVisualPose(c,model,1,{rotationAt:x=>-0.008*x});
+  assert.ok(pose.rotation< -0.02,"The section must rotate as it bends");
+  const withoutFallback=beamVisualPose(c,model,1);
+  assert.equal(withoutFallback.rotation,0);
+});
