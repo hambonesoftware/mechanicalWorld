@@ -78,6 +78,9 @@
           <button id="retryTest" type="button" class="subtle-button">↻ Retry</button>
           <button id="editAgain" type="button" class="subtle-button">✎ Improve</button>
           <button id="nextChallenge" type="button" class="subtle-button highlight">Next ›</button>
+          <button id="unloadTest" type="button" class="subtle-button" hidden>↓ Unload</button>
+          <button id="reloadTest" type="button" class="subtle-button" hidden>↑ Reload</button>
+          <button id="openHistory" type="button" class="subtle-button" hidden>⌁ Curve</button>
         </div>
         <button id="breakTest" type="button" class="break-action">⚡ OVERLOAD UNTIL IT BREAKS</button>
       </section>
@@ -119,7 +122,21 @@
           <div><span>MAX STRAIN</span><strong id="strainMetric">0 με</strong></div>
           <div><span>FORCE</span><strong id="canvasForce">0 kN</strong></div>
           <div><span>SOLVER</span><strong id="solverLabel">Starting…</strong></div>
+          <div><span>RESIDUAL BEND</span><strong id="residualMetric">0 mm</strong></div>
+          <div><span>PLASTIC STRAIN</span><strong id="plasticMetric">0 µε</strong></div>
         </div>
+        <section class="history-panel" aria-label="Force displacement history">
+          <div class="history-heading">
+            <div><span class="eyebrow">TEST HISTORY</span><h3>Load → bend → unload</h3></div>
+            <span id="historyCount">0 samples</span>
+          </div>
+          <svg id="forceDeflectionCurve" width="100%" viewBox="0 0 352 186" aria-label="Recorded loading and unloading curve"></svg>
+          <div class="history-legend"><span class="load">Loading</span><span class="unload">Unloading</span><span class="reload">Reloading</span></div>
+          <label class="history-scrub-label" for="historyScrubber">Replay recorded test <output id="historyPointLabel">No recording yet</output></label>
+          <input id="historyScrubber" type="range" min="0" max="1" step="1" value="0" disabled>
+          <button id="historyLatest" class="secondary-button" type="button">↺ Return to current specimen</button>
+          <p class="fine-print">Numerical curve: fiber-integrated bilinear elastoplastic bending. Fracture markers remain illustrative; after separation, the actuator command is not transmitted through the beam.</p>
+        </section>
         <div class="range-block"><label for="deformationScale">Deformation exaggeration <output id="deformationOutput">8×</output></label><input id="deformationScale" type="range" min="1" max="20" step="1" value="8"></div>
         <div class="lesson"><strong id="lessonTitle">Where is stress highest?</strong><p id="lessonText">The largest moment occurs at the clamp, so the outer fibers carry the highest bending stress.</p></div>
         <button id="dropWeight" class="secondary-button" type="button">↓ Drop demonstration block (Rapier)</button>
@@ -129,9 +146,9 @@
       <div id="helpPanel" class="help-panel" hidden>
         <div class="sheet-header"><h2>How to play</h2><button id="closeHelp" type="button" class="close-sheet" aria-label="Close help">×</button></div>
         <p><b>Build</b> — tap the beam or drag handles to change its shape. The bottom editor provides precise dimensions.</p>
-        <p><b>Test</b> — the hydraulic ram gradually loads the beam. It stops at the chosen target or the first-yield threshold.</p>
+        <p><b>Test</b> — the hydraulic ram ramps to the target. After testing, choose Unload to reveal permanent bending, Reload for the hysteresis curve, or Curve to scrub recorded steps. Use Break It for an illustrative tearing failure.</p>
         <p><b>Inspect</b> — examine stress, elastic strain, deflection and yield safety factor. Drag the scene to orbit; pinch to zoom.</p>
-        <p>Linear-elastic Euler–Bernoulli calculations remain the verified baseline. After first yield, extra bending, crack growth, tearing and separation are an <b>illustrative gameplay damage model</b>, not validated nonlinear FEA. The displayed command after fracture is not force carried by the detached beam. Never use the visual failure threshold for structural design.</p>
+        <p>Elastic FEAScript remains the baseline. Loading/unloading uses a one-dimensional numerical fiber beam with <b>bilinear elastoplastic material behavior</b> and an estimated permanent set. It is a simplified small-deflection model, not validated 3D FEA. Crack growth, tearing and rupture remain illustrative, not material-calibrated predictions. After separation, the actuator command is not force carried by the beam. Never use gameplay thresholds for real structural design.</p>
       </div>
 
       <nav class="mode-dock" aria-label="Game modes">

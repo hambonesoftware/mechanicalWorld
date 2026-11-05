@@ -95,23 +95,31 @@ function stressColor(utilization) {
  * Longitudinal and transverse subdivisions support physically meaningful
  * bending deformation and stress colors, without imported mesh assets.
  */
-function createDeformedStrip(length, h, width, centerY, config, mechanics, displacementAt, damage = null) {
+function createDeformedStrip(length, h, width, centerY, config, mechanics, solution, damage = null) {
   const geometry = new THREE.BoxGeometry(length, h, width, 68, 8, 2);
   const positions = geometry.attributes.position;
   const colors = new Float32Array(positions.count * 3);
   const deformationScale = config.deformationScale;
   const yieldStrength = mechanics.material.yieldStrength;
+  const calculatedPlasticity = Number.isFinite(solution.maxPlasticStrain);
+  // Smoothly compress deformation only for drawing extreme plastic hinges.
+  // The force/displacement chart always uses uncompressed numerical results.
+  const displayDeflection = value => 2.1 * Math.tanh(value / 2.1);
   for (let i = 0; i < positions.count; i += 1) {
     const x = clamp(positions.getX(i) + length / 2, 0, length);
     const localY = positions.getY(i) + centerY;
-    const currentDeflection = displacementAt(x) * deformationScale
-      - (damage?.plasticVisual || 0) * 0.12 * Math.pow(x / config.length, 1.4);
-    const currentRotation = mechanics.rotationAt(x) * deformationScale
-      - (damage?.plasticVisual || 0) * 0.11 * Math.pow(x / config.length, 0.6);
+    const physicalBend = solution.displacementAt(x) * deformationScale;
+    const visualExtra = calculatedPlasticity ? 0 : (damage?.plasticVisual || 0) * 0.12 * Math.pow(x / config.length, 1.4);
+    const currentDeflection = displayDeflection(physicalBend - visualExtra);
+    const rotationAt = solution.rotationAt || mechanics.rotationAt;
+    const currentRotation = clamp(
+      rotationAt(x) * deformationScale -
+      (calculatedPlasticity ? 0 : (damage?.plasticVisual || 0) * 0.11 * Math.pow(x / config.length, 0.6)),
+      -1.3, 0.5);
     const translatedX = positions.getX(i) - Math.sin(currentRotation) * localY;
     const translatedY = centerY + positions.getY(i) * Math.cos(currentRotation) + currentDeflection;
     positions.setXYZ(i, translatedX, translatedY, positions.getZ(i));
-    const stress = Math.abs(mechanics.stressAt(x, localY));
+    const stress = Math.abs(solution.stressAt ? solution.stressAt(x, localY) : mechanics.stressAt(x, localY));
     const color = stressColor(stress / yieldStrength);
     colors[i * 3] = color.r;
     colors[i * 3 + 1] = color.g;
@@ -456,8 +464,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
 
   function updateBeam(config, mechanics, solution, showHeatmap, damage = null) {
     lastConfig = { ...config };
-    lastTipDeflection = solution.tipDeflectionM * config.deformationScale
-      - (damage?.plasticVisual || 0) * 0.12;
+    const extra = Number.isFinite(solution.maxPlasticStrain) ? 0 : (damage?.plasticVisual || 0) * 0.12;
+    lastTipDeflection = 2.1 * Math.tanh((solution.tipDeflectionM * config.deformationScale - extra) / 2.1);
     if (damage?.isSeparated) {
       releaseFracture(config);
       return { overstress: true, separated: true };
@@ -478,7 +486,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     ];
     for (const strip of strips) {
       const geometry = createDeformedStrip(
-        config.length, strip.h, strip.w, strip.y, config, mechanics, solution.displacementAt, damage
+        config.length, strip.h, strip.w, strip.y, config, mechanics, solution, damage
       );
       const mesh = new THREE.Mesh(geometry, showHeatmap ? MATERIALS.heat : config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam);
       mesh.position.x = config.length / 2;
@@ -488,14 +496,13 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       stripMeshes.push(mesh);
     }
     stand.position.x = BASE_X + config.length;
-    const deflection = solution.tipDeflectionM * config.deformationScale
-      - (damage?.plasticVisual || 0) * 0.12;
+    const deflection = lastTipDeflection;
     const contact = BEAM_Y + deflection + config.depth / 2 + 0.05;
     tip.position.y = contact - stand.position.y;
     ram.position.y = contact + 0.37;
     // Clip extreme motion in visual-only actuator movement.
     ram.position.y = Math.max(0.56, ram.position.y);
-    const overstress = mechanics.yieldUtilization >= 1;
+    const overstress = mechanics.yieldUtilization >= 1 || (solution.maxPlasticStrain || 0) > 0;
     tip.material = overstress ? MATERIALS.trim : MATERIALS.screw;
     return { overstress };
   }

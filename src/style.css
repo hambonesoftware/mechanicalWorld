@@ -248,3 +248,58 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
 @media(prefers-reduced-motion:reduce){
  .hb-play--workbench .hb-play__control{transition:none}
 }
+
+
+/* REDLINE v2 — force/displacement workbench recorder.
+   Dense engineering controls stay in INSPECT, not over the moving specimen. */
+.result-card .result-buttons{
+  display:flex;flex-wrap:wrap;gap:8px;
+}
+.result-card .result-buttons button{
+  min-height:44px;flex:1 1 90px;
+}
+.result-card #unloadTest,.result-card #reloadTest{
+  background:#bcdfd3;border-color:#79bcb2;color:#18373a;font-weight:800;
+}
+.result-card #openHistory{
+  background:#283f4a;border-color:#789ca8;color:#e7f1ee;
+}
+.result-card [hidden]{display:none!important}
+.history-panel{
+  margin:16px 0;padding:13px 12px 15px;border-radius:13px;
+  background:#102630;border:1px solid #6e929a66;color:#eef5f3;
+}
+.history-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:7px;
+}
+.history-heading h3{font:800 16px/1.15 system-ui,sans-serif;margin:4px 0 8px;letter-spacing:-.02em}
+.history-heading #historyCount{font-size:10px;color:#a9bdc2;white-space:nowrap}
+#forceDeflectionCurve{width:100%;height:auto;max-height:195px;display:block;overflow:visible}
+#forceDeflectionCurve .cycle-grid line{stroke:#647d86;stroke-width:1}
+#forceDeflectionCurve .cycle-grid .cycle-guide{stroke:#4e6470;stroke-width:.7;stroke-dasharray:2 4}
+#forceDeflectionCurve .cycle-axis{font:700 11px system-ui,sans-serif;fill:#afc5ca}
+#forceDeflectionCurve .cycle-empty{font:750 12px system-ui,sans-serif;fill:#c6dadb}
+.history-legend{display:flex;flex-wrap:wrap;gap:13px;margin:2px 0 12px;font-size:11px;font-weight:700;color:#ccdfe0}
+.history-legend span{display:flex;align-items:center;gap:6px}
+.history-legend span::before{content:"";display:block;width:17px;height:3px;border-radius:3px;background:#efc181}
+.history-legend .unload::before{background:#68ddd1}
+.history-legend .reload::before{background:#a3a9ff}
+.history-scrub-label{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;font-weight:700;color:#dceced}
+#historyPointLabel{font:700 11px/1.3 system-ui,sans-serif;color:#f5d49a;font-variant-numeric:tabular-nums}
+#historyScrubber{width:100%;min-height:38px;accent-color:#e9c586;touch-action:pan-x;cursor:pointer}
+#historyScrubber:disabled{opacity:.4;cursor:default}
+#historyLatest{min-height:44px;width:100%;border-radius:8px;background:#31434c;border-color:#76949c;color:#e3eff0}
+.history-panel .fine-print{font-size:10px;line-height:1.48;color:#b8cad0;margin:11px 0 0}
+#inspectSheet .detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#inspectSheet #solverLabel{font-size:11px;line-height:1.35;overflow-wrap:anywhere}
+@media(max-width:380px){
+  .history-panel{padding:10px 8px}
+  .history-heading h3{font-size:14px}
+  .result-card{max-height:min(53dvh,440px)}
+}
+@media(min-width:900px){
+  #inspectSheet{overflow-y:auto;max-width:425px}
+}
+@media(prefers-reduced-motion:reduce){
+  #forceDeflectionCurve *,#historyScrubber{transition:none!important}
+}

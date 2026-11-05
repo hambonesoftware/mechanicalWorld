@@ -70,3 +70,14 @@ Mechanical World uses the versioned, framework-free **Hambone PLAY v1** core ven
 The Workbench HUD occupies only compact regions of the screen: live load/tip readouts, a contextual event message and a primary test action. The large title, permanent dock and floating data cards are hidden, but their existing DOM values and handlers remain intact. The HUD passes its available rectangle to the Three.js camera, allowing camera framing to account for opened edit and results panels.
 
 The engine and numerical solvers have not been modified to implement the HUD. The shared core is vendored to avoid a gameplay-breaking network dependency on another repository.
+
+
+## REDLINE v2 — calculated permanent bending and load-history replay
+
+The original FEAScript / closed-form Euler–Bernoulli elastic checks remain in place. A separate incremental **one-dimensional fiber beam** now integrates bilinear elastoplastic material response through 32 symmetric layers of the I-section across 40 beam stations. It includes isotropic work hardening, path-dependent plastic strains, bending curvature integration and unloading/reloading in the moment-curvature equilibrium solver.
+
+After a non-rupturing test, **Unload** gradually returns the applied force to zero. The beam holds its calculated residual deflection; **Reload** applies the previous commanded load without resetting plastic history. **Curve** opens the inspection display with a color-separated force vs downward-tip-displacement plot and a scrubber to replay any recorded numerical beam shape. Replay uses frozen numerical snapshots and does **not** mutate the active plastic state.
+
+The live Three.js beam uses the calculated displacement, rotation and fiber stress through load/unload/reload; display-only deformation is smoothly compressed at extreme angles. In contrast, crack/tear/rupture thresholds and broken-body Rapier motion remain deliberately *illustrative* and not a validated fracture model. This is a simplified small-rotation, small-deflection bending solver and cannot substitute for material coupon data, geometric-nonlinear shell/solid FEA, buckling analysis, cyclic Bauschinger effects, or real structural design calculations. The force displayed after rupture is the **actuator command**, not the force transmitted by the detached beam.
+
+New tests check elastic agreement, onset of plasticity, unload residual, elastic-direction reloading, replay isolation, and the complete mobile test → unload → reload → scrub workflow.

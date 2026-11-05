@@ -56,7 +56,7 @@ test("scene remains visible; build, test and inspect work without page scrolling
   await page.locator("#modeInspect").click();
   await expect(page.locator("#inspectSheet")).toBeVisible();
   await expect(page.locator("#lessonText")).not.toBeEmpty();
-  await expect(page.locator("#solverLabel")).toContainText(/FEAScript|Analytical/);
+  await expect(page.locator("#solverLabel")).toContainText(/FEAScript|Analytical|Fiber elastoplastic/);
 });
 
 test("failure is explained, camera controls and challenge selection remain reachable", async ({ page }) => {
@@ -126,4 +126,44 @@ test("Workbench HUD stays contextual during load ramp", async ({ page }, testInf
   await expect(page.locator("#resultCard")).toBeVisible({timeout:18000});
   await expect(page.locator(".hb-play")).toHaveAttribute("data-phase", "result");
   await expect(page.locator("#modeInspect")).toBeVisible();
+});
+
+
+test("numerical loading, unloading, reloading and curve replay preserve plastic set", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "iphone-portrait", "Run full elastoplastic history once on a phone.");
+  await waitForLab(page);
+  await page.locator("#modeBuild").click();
+  await page.locator("#targetLoadControl").evaluate(node => {
+    node.value = "44";
+    node.dispatchEvent(new Event("input", { bubbles:true }));
+  });
+  await page.locator("#modeTest").click();
+  await expect(page.locator("#resultCard")).toBeVisible({timeout:18000});
+  await expect(page.locator("#resultTitle")).toContainText("PERMANENT DEFORMATION");
+  await expect(page.locator("#unloadTest")).toBeVisible();
+  await page.locator("#unloadTest").click();
+  await expect(page.locator("#resultTitle")).toContainText("UNLOADED",{timeout:18000});
+  await expect(page.locator("#resultDetail")).toContainText("permanent tip displacement");
+  const remaining = await page.locator("#resultDetail").textContent();
+  const mm = /predicts ([0-9.]+) mm/.exec(remaining);
+  expect(mm).not.toBeNull();
+  expect(Number(mm[1])).toBeGreaterThan(0.01);
+  await expect(page.locator("#reloadTest")).toBeVisible();
+  await page.locator("#reloadTest").click();
+  await expect(page.locator("#resultCard")).toBeVisible({timeout:18000});
+  await expect(page.locator("#canvasForce")).toContainText("44.0 kN");
+  await page.locator("#openHistory").click();
+  await expect(page.locator("#inspectSheet")).toBeVisible();
+  await expect(page.locator("#solverLabel")).toContainText("Fiber elastoplastic beam");
+  await expect(page.locator("#forceDeflectionCurve polyline").first()).toBeVisible();
+  const size = await page.locator("#historyScrubber").getAttribute("max");
+  expect(Number(size)).toBeGreaterThan(20);
+  await page.locator("#historyScrubber").evaluate(node => {
+    node.value = "0";
+    node.dispatchEvent(new Event("input",{bubbles:true}));
+  });
+  await expect(page.locator("#historyPointLabel")).toContainText("0.0 kN");
+  await page.locator("#historyLatest").click();
+  await expect(page.locator("#historyPointLabel")).toContainText("44.0 kN");
+  await page.screenshot({path:"test-results/iphone-portrait-plastic-history.png"});
 });

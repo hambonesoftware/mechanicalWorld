@@ -41,7 +41,7 @@ test("PWA manifest uses the Vite base path for GitHub Pages", () => {
 test("destructive test actions exist and explain illustrative damage", () => {
   assert.match(html, /id="breakTest"/);
   assert.match(html, /id="destructiveTest"/);
-  assert.match(html, /illustrative gameplay damage model/);
+  assert.match(html, /Crack growth, tearing and rupture remain illustrative/);
   assert.match(js, /destructiveTargetKN/);
   assert.match(js, /no longer transmits/);
 });
@@ -52,4 +52,15 @@ test("Hambone PLAY v1 is wired without replacing existing gameplay controls", ()
   assert.match(js, /hud\.placeControl\(\$\(id\), "actions"\)/);
   assert.match(js, /setSafeFrameCallback/);
   assert.match(css, /\.mode-dock\{display:none!important\}/);
+});
+
+
+test("nonlinear unloading UI exposes a labeled and replayable force-displacement history", () => {
+  for (const id of ["unloadTest","reloadTest","openHistory","forceDeflectionCurve",
+    "historyScrubber","historyLatest","historyPointLabel","residualMetric","plasticMetric"]) {
+    assert.match(html, new RegExp('id="' + id + '"'));
+  }
+  assert.match(js,/createPlasticBeam/);
+  assert.match(js,/replayPlasticSnapshot/);
+  assert.match(js,/cycle === "unload"/);
 });
