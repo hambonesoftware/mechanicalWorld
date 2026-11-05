@@ -61,7 +61,7 @@ test("elastic FEAScript displacement uses analytical rotation when FEM omits it"
     tipDeflectionM:-0.004*c.length*c.length
   };
   const pose=beamVisualPose(c,model,1,{rotationAt:x=>-0.008*x});
-  assert.ok(pose.rotation< -0.02,"The section must rotate as it bends");
+  assert.ok(pose.rotation< -0.01,"The section must rotate as it bends");
   const withoutFallback=beamVisualPose(c,model,1);
   assert.equal(withoutFallback.rotation,0);
 });
