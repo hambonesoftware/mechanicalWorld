@@ -193,3 +193,58 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
 @media(prefers-reduced-motion:reduce){
   .app-shell[data-damage-stage="ruptured"] #laboratory{animation:none}
 }
+
+
+/* Hambone PLAY v1 — immersive Workbench HUD. Legacy markup remains in the
+   DOM so existing game logic and Playwright selectors keep functioning. */
+.app-shell.hb-play-surface{--hb-accent:#f2c38a}
+.app-shell .hb-play--workbench{--hb-accent:#eec089;--hb-outline:#d5e3df40;--hb-surface:#12232de8;--hb-hud-top:14px}
+.topbar,.objective-card,.hud-bottom,.mode-dock{display:none!important}
+.hb-play--workbench .hb-play__scorebug{top:calc(12px + env(safe-area-inset-top,0px));border-radius:7px;background:#192d36d9}
+.hb-play--workbench .hb-play__identity{font-family:"Space Grotesk",sans-serif;color:#f4c184;font-size:12px;min-width:52px;letter-spacing:.03em}
+.hb-play--workbench .hb-play__readout-label{color:#b8c7c8}
+.hb-play--workbench .hb-play__readout-value{font-family:"Space Grotesk",sans-serif}
+.hb-play--workbench .hb-play__status{font-size:12px;border-radius:7px;max-width:80%;padding:7px 10px;background:#1a2a32e0}
+.hb-play--workbench .hb-play__utilities .icon-button{background:#1a303cda;width:45px;height:45px;border-radius:11px;color:#fff}
+.hb-play--workbench .hb-play__actions .dock-button{
+  display:flex!important;min-height:52px;gap:6px;align-items:center;
+  width:auto!important;flex:0 0 auto;padding:10px 13px;border-radius:11px;
+  background:#1b303bdd;color:#e8eef0;border:1px solid #81959a88;
+  box-shadow:0 6px 20px #0007;letter-spacing:0;font-size:12px
+}
+.hb-play--workbench .hb-play__actions .dock-button span{font-size:19px}
+.hb-play--workbench .hb-play__actions #modeTest{
+  flex:0 1 165px;min-width:118px;background:#efbd80;color:#1a2930;
+  border-color:#f5d29f;box-shadow:0 5px 20px #0007
+}
+.hb-play--workbench[data-phase="ready"] #modeInspect{display:none!important}
+.hb-play--workbench[data-phase="playing"] #modeBuild,
+.hb-play--workbench[data-phase="playing"] #modeInspect{display:none!important}
+.hb-play--workbench[data-phase="result"] #modeInspect{display:flex!important}
+.hb-play--workbench .hb-play__actions{justify-content:center;gap:8px}
+.hb-play--workbench .hb-play__announcement{top:23%;border-radius:5px;font-family:"Space Grotesk",sans-serif;letter-spacing:-.02em}
+.hb-play--workbench .hb-play__control:active{transform:translateY(1px)}
+.settings-menu{position:absolute;z-index:45;right:12px;top:calc(66px + env(safe-area-inset-top,0px))}
+.settings-menu .menu-challenge{width:100%;min-height:44px;font-size:14px;text-align:left;border:0;border-radius:8px}
+.tool-sheet{z-index:28;bottom:calc(70px + env(safe-area-inset-bottom,0px));max-height:min(43dvh,390px)}
+#inspectSheet{max-height:min(48dvh,470px)}
+.result-card{z-index:29;bottom:calc(78px + env(safe-area-inset-bottom,0px));background:#1f383de9;max-width:460px}
+.handle-layer{z-index:26}
+.scene-floating-actions{z-index:28;top:calc(74px + env(safe-area-inset-top,0px))}
+#sceneLoading{z-index:60}
+@media(max-width:380px){
+ .hb-play--workbench .hb-play__scorebug{max-width:calc(100% - 65px);gap:6px}
+ .hb-play--workbench .hb-play__identity{font-size:10px;min-width:42px}
+ .hb-play--workbench .hb-play__readouts{gap:6px}
+ .hb-play--workbench .hb-play__readout-value{font-size:13px}
+ .hb-play--workbench .hb-play__actions .dock-button{padding:10px;font-size:11px}
+ .hb-play--workbench .hb-play__actions #modeTest{min-width:106px}
+}
+@media(min-width:900px){
+ .tool-sheet{bottom:88px;max-height:none}
+ .hb-play--workbench .hb-play__actions{left:50%;right:auto;transform:translateX(-50%);width:430px}
+ .result-card{bottom:100px}
+}
+@media(prefers-reduced-motion:reduce){
+ .hb-play--workbench .hb-play__control{transition:none}
+}

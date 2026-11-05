@@ -61,3 +61,12 @@ CI checks elastic mechanics, staged damage events, the production build and resp
 ## Future engineering-quality moonshot
 
 A stronger solver stack would include Timoshenko beam/frame models, elastoplasticity with hardening, geometric nonlinearity and local buckling, 3D solid/shell FEA, fracture-energy regularization, cohesive-zone or phase-field crack growth, digital image correlation-style strain maps, and load-displacement curves. Each needs independently verified reference cases, calibrated materials, convergence studies, and clearly declared model limitations before being called predictive.
+
+
+## Hambone PLAY integration
+
+Mechanical World uses the versioned, framework-free **Hambone PLAY v1** core vendored at \`src/vendor/hambone-play/\`. The authoritative component and API live in [Hambone Arcade](https://github.com/hambonesoftware/arcade/tree/main/play/v1).
+
+The Workbench HUD occupies only compact regions of the screen: live load/tip readouts, a contextual event message and a primary test action. The large title, permanent dock and floating data cards are hidden, but their existing DOM values and handlers remain intact. The HUD passes its available rectangle to the Three.js camera, allowing camera framing to account for opened edit and results panels.
+
+The engine and numerical solvers have not been modified to implement the HUD. The shared core is vendored to avoid a gameplay-breaking network dependency on another repository.

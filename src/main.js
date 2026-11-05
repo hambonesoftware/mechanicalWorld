@@ -2,8 +2,42 @@ import { STARTER, CHALLENGES, beamAnalysis, checkChallenge } from "./engineering
 import { getBeamSolution } from "./engineering/fem.js";
 import { damageState, destructiveTargetKN } from "./engineering/damage.js";
 import { createLaboratory } from "./scene/lab.js";
+import { createPlayHUD } from "./vendor/hambone-play/hambone-play.js";
 
 const $ = (id) => document.getElementById(id);
+let playHUD = null;
+
+function initializeGameHUD() {
+  const hud = createPlayHUD({
+    root: $("game"),
+    viewport: $("scenePanel"),
+    style: "workbench",
+    title: "REDLINE",
+    density: "standard",
+    metrics: [
+      { id: "force", label: "LOAD", value: "0 kN" },
+      { id: "deflection", label: "TIP", value: "0 mm" },
+      { id: "target", label: "TARGET", value: "12 kN" }
+    ]
+  });
+  for (const id of ["modeBuild", "modeTest", "modeInspect"]) {
+    hud.placeControl($(id), "actions");
+  }
+  $("modeTest").classList.add("is-primary");
+  hud.placeControl($("settingsToggle"), "utilities");
+  // Keep challenge switching available without a persistent top-level header.
+  const next = $("challengeNext");
+  $("settingsMenu").insertBefore(next, $("cameraReset"));
+  next.classList.add("menu-challenge");
+  hud.registerOccluder($("buildSheet"));
+  hud.registerOccluder($("inspectSheet"));
+  hud.registerOccluder($("resultCard"));
+  hud.setSafeFrameCallback(rect => {
+    settings.rig?.setSafeFrame?.(rect);
+  });
+  return hud;
+}
+
 const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const settings = {
   challengeIndex: 0,
@@ -38,6 +72,10 @@ function n(value, digits = 1) {
 function setStatus(text, kind = "ready") {
   $("statusText").textContent = text;
   $("statusPill").className = "status-pill " + kind;
+  if (playHUD) {
+    const tone = kind === "failed" ? "danger" : kind === "passed" ? "positive" : kind === "testing" ? "warning" : "neutral";
+    playHUD.setStatus(text, tone);
+  }
 }
 
 function updateMaterialButtons() {
@@ -67,6 +105,7 @@ function updateChallengeHeader() {
   $("challengeTitle").textContent = level.name;
   $("objectiveText").textContent = "Support " + level.loadKN + " kN · ≤ " + level.maxDeflectionMM + " mm deflection";
   $("loadTarget").textContent = n(settings.targetLoad, 1) + " kN test";
+  playHUD?.setMetric("target", n(challenge.loadKN, 1) + " kN");
 }
 
 function setMode(next) {
@@ -83,6 +122,9 @@ function setMode(next) {
   if (build) settings.heatmap = false;
   if (inspect) settings.heatmap = true;
   $("game").dataset.mode = next;
+  playHUD?.setPhase(build || inspect ? "editing" : "ready");
+  $("modeBuild").querySelector("b").textContent = build ? "DONE" : "EDIT";
+  $("modeInspect").querySelector("b").textContent = inspect ? "CLOSE" : "DETAILS";
   $("buildSheet").hidden = !build;
   $("inspectSheet").hidden = !inspect;
   $("handleLayer").hidden = !build;
@@ -165,6 +207,8 @@ function renderAnalysis() {
     const damage = damageState(config, config.forceKN);
     settings.rig.updateBeam(config, mechanics, solution, settings.heatmap, damage);
     $("game").dataset.damageStage = damage.stage;
+    playHUD?.setMetric("force", n(config.forceKN, 1) + " kN");
+    playHUD?.setMetric("deflection", n(Math.abs(solution.tipDeflectionM) * 1000, 2) + " mm");
     if (settings.testing && damage.stage !== settings.lastDamageStage) {
       const captions = {
         elastic: "Elastic response",
@@ -174,6 +218,9 @@ function renderAnalysis() {
         ruptured: "Specimen separated — actuator command continues"
       };
       setStatus(captions[damage.stage] || "Loading specimen", damage.isSeparated ? "failed" : "testing");
+      if (damage.stage !== "elastic") playHUD?.showEvent(captions[damage.stage], {
+        tone: damage.isSeparated ? "danger" : "warning", duration: 1500
+      });
       settings.lastDamageStage = damage.stage;
     }
 
@@ -242,6 +289,7 @@ function announceResult(data, destructive = false) {
   const ruptured = damage.isSeparated;
   $("game").dataset.mode = "complete";
   settings.mode = "complete";
+  playHUD?.setPhase("result");
   $("resultCard").hidden = false;
   $("resultCard").classList.toggle("failed", !success);
   $("resultIcon").textContent = success ? "✓" : "!";
@@ -288,6 +336,7 @@ function runTest({ destructive = false } = {}) {
   settings.testing = true;
   settings.completed = false;
   settings.mode = "testing";
+  playHUD?.setPhase("playing");
   settings.heatmap = false; // Let the material tear visibly instead of hiding detail behind rainbow colors.
   settings.lastDamageStage = "elastic";
   $("game").dataset.mode = "testing";
@@ -488,6 +537,7 @@ function followHandleAnchors() {
 
 async function main() {
   connectControls();
+  playHUD = initializeGameHUD();
   updateChallengeHeader();
   updateSliderValues();
   try {

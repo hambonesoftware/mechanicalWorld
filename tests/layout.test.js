@@ -45,3 +45,11 @@ test("destructive test actions exist and explain illustrative damage", () => {
   assert.match(js, /destructiveTargetKN/);
   assert.match(js, /no longer transmits/);
 });
+
+test("Hambone PLAY v1 is wired without replacing existing gameplay controls", () => {
+  assert.match(html, /hambone-play\/hambone-play\.css/);
+  assert.match(js, /createPlayHUD/);
+  assert.match(js, /hud\.placeControl\(\$\(id\), "actions"\)/);
+  assert.match(js, /setSafeFrameCallback/);
+  assert.match(css, /\.mode-dock\{display:none!important\}/);
+});

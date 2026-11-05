@@ -18,6 +18,9 @@ test("scene remains visible; build, test and inspect work without page scrolling
   expect(screen.scrollHeight, "The game should not require document scrolling").toBeLessThanOrEqual(screen.innerHeight + 2);
   expect(screen.canvasHeight).toBeGreaterThan(screen.viewportHeight * 0.8);
 
+  await expect(page.locator(".hb-play--workbench")).toBeVisible();
+  await expect(page.locator(".hb-play__readout")).toHaveCount(3);
+  await expect(page.locator(".topbar")).toBeHidden();
   await expect(page.locator("#modeTest")).toBeVisible();
   await expect(page.locator("#buildSheet")).toBeHidden();
   await page.screenshot({ path: "test-results/" + testInfo.project.name + "-ready.png" });
@@ -101,4 +104,17 @@ test("Break It mode surpasses a safe 12 kN command until rupture", async ({ page
   const fullCommand = await page.locator("#canvasForce").innerText();
   expect(parseFloat(fullCommand)).toBeGreaterThan(12);
   await expect(page.locator("#resultDetail")).toContainText("actuator completed");
+});
+
+test("Workbench HUD stays contextual during load ramp", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "iphone-portrait", "Run representative phone flow once.");
+  await waitForLab(page);
+  await expect(page.locator(".hb-play")).toHaveAttribute("data-phase", "ready");
+  await expect(page.locator("#modeInspect")).toBeHidden();
+  await page.locator("#modeTest").click();
+  await expect(page.locator(".hb-play")).toHaveAttribute("data-phase", "playing");
+  await expect(page.locator("#modeBuild")).toBeHidden();
+  await expect(page.locator("#resultCard")).toBeVisible({timeout:18000});
+  await expect(page.locator(".hb-play")).toHaveAttribute("data-phase", "result");
+  await expect(page.locator("#modeInspect")).toBeVisible();
 });

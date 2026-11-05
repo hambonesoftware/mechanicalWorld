@@ -231,6 +231,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let lastTipDeflection = 0;
   let lastFullFrame = false;
   let lastSceneMode = "ready";
+  let cameraSafeFrame = null;
 
   // Rapier is used for rigid sample motion; the beam itself uses FEAScript.
   try {
@@ -512,9 +513,15 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     const widthFit = span / (2 * Math.tan(horizontalFov / 2)) * 1.08;
     const heightFit = vertical / (2 * Math.tan(fov / 2)) * 1.18;
     const distance = THREE.MathUtils.clamp(Math.max(widthFit, heightFit, 2.8), 2.8, 18);
-    const centerX = beamOnly ? BASE_X + config.length * 0.48 : 0;
+    let centerX = beamOnly ? BASE_X + config.length * 0.48 : 0;
     const isEditing = mode === "build" || mode === "inspect";
-    const centerY = isEditing && aspect < 0.95 ? 0.63 : 1.27;
+    let centerY = isEditing && aspect < 0.95 ? 0.80 : 1.27;
+    if (cameraSafeFrame && viewport.width && viewport.height) {
+      const offsetX = cameraSafeFrame.centerX / viewport.width - 0.5;
+      const offsetY = cameraSafeFrame.centerY / viewport.height - 0.5;
+      centerX -= offsetX * (beamOnly ? config.length : 3.2) * 0.72;
+      centerY += offsetY * (beamOnly ? 1.45 : 2.25) * 0.70;
+    }
     orbit.target.set(centerX, centerY, 0);
     camera.position.set(centerX + distance * 0.19, centerY + distance * 0.28, distance * 0.94);
     camera.lookAt(orbit.target);
@@ -523,6 +530,15 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
 
   function setViewForMode(mode, config) {
     focusCamera(config, !lastFullFrame, mode);
+  }
+
+  function setSafeFrame(rect) {
+    if (!rect || !Number.isFinite(rect.centerX) || !Number.isFinite(rect.centerY)) return;
+    const changed = !cameraSafeFrame ||
+      Math.abs(rect.centerX - cameraSafeFrame.centerX) > 20 ||
+      Math.abs(rect.centerY - cameraSafeFrame.centerY) > 20;
+    cameraSafeFrame = rect;
+    if (changed && lastConfig) focusCamera(lastConfig, !lastFullFrame, lastSceneMode);
   }
 
   function worldToScreen(worldPoint) {
@@ -622,6 +638,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     dropWeight,
     focusCamera,
     setViewForMode,
+    setSafeFrame,
     getHandleAnchors,
     pickBeam,
     dispose() {
