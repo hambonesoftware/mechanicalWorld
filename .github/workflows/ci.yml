@@ -1,0 +1,40 @@
+name: Check physics and build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned physics dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run engineering tests
+        run: npm test
+      - name: Build game
+        run: npm run build
+        env:
+          GITHUB_PAGES: 'true'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mechanical-world-build
+          path: dist/
+      - name: Commit resolved dependency lockfile
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: lock verified npm dependency tree"
+            git push origin HEAD:main
+          fi

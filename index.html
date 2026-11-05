@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="theme-color" content="#101d29"/>
+  <meta name="description" content="Mechanical World: REDLINE — a hands-on structural mechanics arcade laboratory."/>
+  <title>REDLINE — Mechanical World</title>
+  <link rel="stylesheet" href="/src/style.css"/>
+  <script type="module" src="/src/main.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Mechanical World home">
+        <span class="mark"><span class="mark-core"></span></span>
+        <span class="brand-copy"><strong>MECHANICAL<span>WORLD</span></strong><small>REDLINE ENGINEERING LAB</small></span>
+      </a>
+      <div class="header-right">
+        <div class="system-chip"><span class="status-light"></span> <span id="engineStatus">INITIALIZING ENGINES</span></div>
+        <a class="arcade-link" href="https://hambonesoftware.github.io/arcade/" target="_blank" rel="noopener noreferrer">HAMBONE ARCADE <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="intro">
+        <div>
+          <span class="eyebrow">THE FORCES ARE REAL. THE TEST IS YOURS.</span>
+          <h1>Meet your <em>breaking point.</em></h1>
+          <p>Design a lighter, smarter cantilever. Apply a load, watch the stress move, and learn what makes a structure survive.</p>
+        </div>
+        <div class="mission-pill"><span>LAB <b>01</b></span><small>CANTILEVER TEST</small></div>
+      </section>
+
+      <div class="game-layout">
+        <section class="scene-panel" aria-label="3D mechanical testing laboratory">
+          <div class="scene-toolbar">
+            <div class="live-label"><i></i> LIVE MECHANICS</div>
+            <div class="view-actions">
+              <button id="cameraReset" class="icon-button" title="Reset camera" aria-label="Reset camera">⌖</button>
+              <button id="heatToggle" class="mode-button active" aria-pressed="true">◉ <span>STRESS MAP</span></button>
+            </div>
+          </div>
+          <canvas id="laboratory" aria-label="Interactive 3D laboratory. Drag to orbit, scroll to zoom."></canvas>
+          <div class="scene-corner scene-corner-left">
+            <span class="readout-eyebrow">APPLIED LOAD</span>
+            <strong id="canvasForce">12.0 <small>kN</small></strong>
+            <div class="mini-load-track"><div id="miniLoadFill"></div></div>
+          </div>
+          <div class="scene-corner scene-corner-right">
+            <span class="readout-eyebrow">EXAGGERATED DEFORMATION</span>
+            <strong id="canvasScale">8×</strong>
+            <span class="scene-note">Drag to orbit · pinch to zoom</span>
+          </div>
+          <div id="sceneLoading" class="scene-loading"><div class="loading-ring"></div><strong>Preparing the laboratory</strong><small>Loading procedural machinery and physics</small></div>
+          <div class="scene-underbar">
+            <span class="color-label">STRESS / YIELD</span>
+            <div class="color-bar"><span></span></div>
+            <span class="legend-label">LOW</span><span class="legend-label">HIGH</span>
+            <div class="scene-spacer"></div>
+            <span id="solverLabel">Solver: initializing</span>
+          </div>
+        </section>
+
+        <aside class="controls-panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">THE CHALLENGE</span><h2 id="challengeTitle">The Cantilever</h2></div>
+            <span class="level-counter" id="challengeNumber">01 / 03</span>
+          </div>
+          <div class="challenge-tabs" aria-label="Challenges">
+            <button class="challenge-button selected" data-challenge="0" aria-pressed="true">01</button>
+            <button class="challenge-button" data-challenge="1" aria-pressed="false">02</button>
+            <button class="challenge-button" data-challenge="2" aria-pressed="false">03</button>
+          </div>
+          <p id="challengeDescription" class="challenge-description">Hold 12 kN without yielding or flexing more than 12 mm.</p>
+          <div id="resultBanner" class="result-banner pending"><span class="result-icon">●</span><div><strong id="resultTitle">READY FOR TEST</strong><small id="resultDetail">Apply the required load to evaluate your beam.</small></div></div>
+
+          <div class="control-group">
+            <div class="section-label"><span>01 / LOADING</span><span class="section-rule"></span></div>
+            <div class="range-row"><label for="load">Applied tip force</label><output id="loadOutput" for="load">12.0 kN</output></div>
+            <input id="load" class="slider" type="range" min="0" max="60" step="0.5" value="12"/>
+            <div class="range-ends"><span>0 kN</span><span>60 kN</span></div>
+          </div>
+
+          <div class="control-group">
+            <div class="section-label"><span>02 / MATERIAL</span><span class="section-rule"></span></div>
+            <div class="segment-control" role="group" aria-label="Material">
+              <button class="selected" data-material="steel" aria-pressed="true">STEEL</button>
+              <button data-material="aluminum" aria-pressed="false">ALUMINUM</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="section-label"><span>03 / GEOMETRY</span><span class="section-rule"></span></div>
+            <div class="range-row"><label for="length">Beam length</label><output id="lengthOutput" for="length">2.00 m</output></div>
+            <input id="length" class="slider" type="range" min="1.5" max="3.5" step="0.05" value="2"/>
+            <div class="range-row second-range"><label for="depth">Section height</label><output id="depthOutput" for="depth">200 mm</output></div>
+            <input id="depth" class="slider" type="range" min="0.08" max="0.35" step="0.005" value="0.2"/>
+            <div class="range-row second-range"><label for="width">Flange width</label><output id="widthOutput" for="width">120 mm</output></div>
+            <input id="width" class="slider" type="range" min="0.07" max="0.2" step="0.005" value="0.12"/>
+          </div>
+
+          <div class="control-group secondary-controls">
+            <div class="range-row"><label for="deformationScale">Visual deflection scale</label><output id="deformationOutput" for="deformationScale">8×</output></div>
+            <input id="deformationScale" class="slider" type="range" min="1" max="20" step="1" value="8"/>
+          </div>
+
+          <div class="button-row">
+            <button id="resetBeam" class="action-button secondary">↻ RESET DESIGN</button>
+            <button id="dropWeight" class="action-button primary">↓ DROP TEST BLOCK</button>
+          </div>
+          <p class="button-hint">The falling block demonstrates Rapier rigid-body motion separately; it does not apply the beam's calculated tip load.</p>
+        </aside>
+      </div>
+
+      <section class="data-panel">
+        <div class="data-head"><span class="eyebrow">THE NUMBERS BEHIND THE MOTION</span><span>LINEAR ELASTIC ANALYSIS · SI UNITS</span></div>
+        <div class="stat-grid">
+          <article class="stat-card"><span>MAX BENDING STRESS</span><strong id="stressMetric">—</strong><small>MPa · fixed-end outer fiber</small></article>
+          <article class="stat-card"><span>TIP DEFLECTION</span><strong id="deflectionMetric">—</strong><small>mm · FEM solution</small></article>
+          <article class="stat-card"><span>STRAIN</span><strong id="strainMetric">—</strong><small>µε · maximum bending</small></article>
+          <article class="stat-card"><span>FACTOR OF SAFETY</span><strong id="safetyMetric">—</strong><small>relative to first yield</small></article>
+          <article class="stat-card mass-card"><span>STRUCTURE MASS</span><strong id="massMetric">—</strong><small>kg · excludes test rig</small></article>
+        </div>
+        <div class="lesson">
+          <div class="lesson-icon">i</div>
+          <div><strong id="lessonTitle">Why is the root stressed?</strong><p id="lessonText">A tip force creates the largest bending moment at the clamped end. The beam's outer fibers carry the highest bending stress.</p></div>
+          <span class="lesson-tag">LEARN AS YOU PLAY</span>
+        </div>
+      </section>
+      <footer class="footer"><span>MECHANICAL WORLD / REDLINE v0.1</span><span>Educational demonstration — not for structural design or safety certification.</span><a href="https://github.com/hambonesoftware/mechanicalWorld" target="_blank" rel="noopener noreferrer">SOURCE CODE ↗</a></footer>
+    </main>
+  </div>
+</body>
+</html>
