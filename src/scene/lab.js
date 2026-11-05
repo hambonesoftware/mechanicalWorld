@@ -18,6 +18,7 @@ const MATERIALS = {
   rubber: metal(0x25313c, 0.9, 0.05),
   floor: metal(0x213441, 0.95, 0.04),
   beam: metal(0x9caebc, 0.37),
+  aluminum: metal(0xc4cdd4, 0.25, 0.78),
   heat: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.38, roughness: 0.47, side: THREE.DoubleSide }),
   glass: new THREE.MeshPhysicalMaterial({ color: 0xaedce3, roughness: 0.1, metalness: 0.12, transparent: true, opacity: 0.22, depthWrite: false })
 };
@@ -130,11 +131,11 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 65);
-  camera.position.set(4.85, 3.25, 5.7);
+  camera.position.set(1.1, 2.55, 5.2);
   const orbit = new OrbitControls(camera, canvas);
-  orbit.target.set(0.05, 1.13, 0);
-  orbit.minDistance = 3.7;
-  orbit.maxDistance = 13;
+  orbit.target.set(-0.45, 1.15, 0);
+  orbit.minDistance = 2.1;
+  orbit.maxDistance = 18;
   orbit.minPolarAngle = 0.21;
   orbit.maxPolarAngle = Math.PI * 0.49;
   orbit.enableDamping = true;
@@ -193,7 +194,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   const tip = cyl(stand, 0.14, 0.095, 0, 1.13, 0, MATERIALS.trim);
 
   const nameplate = makeSign("REDLINE / LAB 01", 1.44);
-  nameplate.position.set(-0.02, 0.87, 1.04);
+  nameplate.position.set(0.72, 0.52, 1.04);
   scene.add(nameplate);
   const machineGroup = new THREE.Group();
   scene.add(machineGroup);
@@ -209,6 +210,12 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let animationId = 0;
   let lastTick = 0;
   let frameAccumulator = 0;
+  let cachedWidth = 0;
+  let cachedHeight = 0;
+  let lastConfig = null;
+  let lastTipDeflection = 0;
+  let lastFullFrame = false;
+  let lastSceneMode = "ready";
 
   // Rapier is used for rigid sample motion; the beam itself uses FEAScript.
   try {
@@ -240,6 +247,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   }
 
   function updateBeam(config, mechanics, solution, showHeatmap) {
+    lastConfig = { ...config };
+    lastTipDeflection = solution.tipDeflectionM * config.deformationScale;
     const oldMeshes = [...stripMeshes];
     for (const mesh of oldMeshes) {
       beamGroup.remove(mesh);
@@ -255,7 +264,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       const geometry = createDeformedStrip(
         config.length, strip.h, strip.w, strip.y, config, mechanics, solution.displacementAt
       );
-      const mesh = new THREE.Mesh(geometry, showHeatmap ? MATERIALS.heat : MATERIALS.beam);
+      const mesh = new THREE.Mesh(geometry, showHeatmap ? MATERIALS.heat : config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam);
       mesh.position.x = config.length / 2;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -274,20 +283,80 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     return { overstress };
   }
 
-  function focusCamera() {
-    orbit.target.set(0.10, 1.23, 0);
-    camera.position.set(4.8, 3.3, 5.65);
+  function focusCamera(config = lastConfig, beamOnly = true, mode = lastSceneMode) {
+    if (!config) return;
+    lastFullFrame = !beamOnly;
+    lastSceneMode = mode;
+    const viewport = canvas.getBoundingClientRect();
+    const aspect = Math.max(0.32, viewport.width / Math.max(1, viewport.height));
+    const fov = THREE.MathUtils.degToRad(camera.fov);
+    const horizontalFov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+    const span = beamOnly ? config.length + 0.65 : 5.5;
+    const vertical = beamOnly ? 1.5 : 2.9;
+    const widthFit = span / (2 * Math.tan(horizontalFov / 2)) * 1.08;
+    const heightFit = vertical / (2 * Math.tan(fov / 2)) * 1.18;
+    const distance = THREE.MathUtils.clamp(Math.max(widthFit, heightFit, 2.8), 2.8, 18);
+    const centerX = beamOnly ? BASE_X + config.length * 0.48 : 0;
+    const isEditing = mode === "build" || mode === "inspect";
+    const centerY = isEditing && aspect < 0.95 ? 0.63 : 1.27;
+    orbit.target.set(centerX, centerY, 0);
+    camera.position.set(centerX + distance * 0.19, centerY + distance * 0.28, distance * 0.94);
+    camera.lookAt(orbit.target);
     orbit.update();
   }
 
+  function setViewForMode(mode, config) {
+    focusCamera(config, !lastFullFrame, mode);
+  }
+
+  function worldToScreen(worldPoint) {
+    const bounds = canvas.getBoundingClientRect();
+    const projected = worldPoint.clone().project(camera);
+    return {
+      x: (projected.x * 0.5 + 0.5) * bounds.width,
+      y: (1 - (projected.y * 0.5 + 0.5)) * bounds.height
+    };
+  }
+
+  function getHandleAnchors(config) {
+    const tipX = BASE_X + config.length;
+    const tipY = BEAM_Y + lastTipDeflection;
+    return {
+      length: worldToScreen(new THREE.Vector3(tipX - 0.10, tipY + 0.24, 0.2)),
+      depth: worldToScreen(new THREE.Vector3(BASE_X + Math.min(config.length * 0.39, 0.9), BEAM_Y + config.depth * 0.55 + 0.25, 0.1)),
+      load: worldToScreen(new THREE.Vector3(tipX + 0.10, tipY + 0.81, 0.1))
+    };
+  }
+
+  // A forgiving screen-space hit area is more usable than pixel-perfect
+  // raycasting against a 6–12 pixel thick beam on a phone.
+  function pickBeam(clientX, clientY) {
+    if (!lastConfig) return false;
+    const bounds = canvas.getBoundingClientRect();
+    const a = worldToScreen(new THREE.Vector3(BASE_X, BEAM_Y, 0));
+    const b = worldToScreen(new THREE.Vector3(BASE_X + lastConfig.length, BEAM_Y + lastTipDeflection, 0));
+    const pointX = clientX - bounds.left;
+    const pointY = clientY - bounds.top;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const t = THREE.MathUtils.clamp(((pointX - a.x) * dx + (pointY - a.y) * dy) / Math.max(1, dx * dx + dy * dy), 0, 1);
+    return Math.hypot(pointX - (a.x + dx * t), pointY - (a.y + dy * t)) < 44;
+  }
+
   function resize() {
-    const rect = canvas.getBoundingClientRect();
-    const width = Math.max(1, Math.round(rect.width));
-    const height = Math.max(1, Math.round(rect.height));
-    if (canvas.width === width && canvas.height === height) return;
+    const bounds = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(bounds.width));
+    const height = Math.max(1, Math.round(bounds.height));
+    if (width === cachedWidth && height === cachedHeight) return;
+    const oldAspect = camera.aspect;
+    cachedWidth = width;
+    cachedHeight = height;
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    if (lastConfig && Math.abs(oldAspect - camera.aspect) > 0.13) {
+      focusCamera(lastConfig, !lastFullFrame, lastSceneMode);
+    }
   }
   function frame(timestamp) {
     animationId = requestAnimationFrame(frame);
@@ -318,6 +387,9 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     updateBeam,
     dropWeight,
     focusCamera,
+    setViewForMode,
+    getHandleAnchors,
+    pickBeam,
     dispose() {
       cancelAnimationFrame(animationId);
       orbit.dispose();
