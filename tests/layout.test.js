@@ -37,3 +37,11 @@ test("PWA manifest uses the Vite base path for GitHub Pages", () => {
   assert.match(html, /href="%BASE_URL%manifest\.webmanifest"/);
   assert.doesNotMatch(html, /href="\/manifest\.webmanifest"/);
 });
+
+test("destructive test actions exist and explain illustrative damage", () => {
+  assert.match(html, /id="breakTest"/);
+  assert.match(html, /id="destructiveTest"/);
+  assert.match(html, /illustrative gameplay damage model/);
+  assert.match(js, /destructiveTargetKN/);
+  assert.match(js, /no longer transmits/);
+});

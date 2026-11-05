@@ -1,5 +1,6 @@
 import { STARTER, CHALLENGES, beamAnalysis, checkChallenge } from "./engineering/beam.js";
 import { getBeamSolution } from "./engineering/fem.js";
+import { damageState, destructiveTargetKN } from "./engineering/damage.js";
 import { createLaboratory } from "./scene/lab.js";
 
 const $ = (id) => document.getElementById(id);
@@ -13,7 +14,9 @@ const settings = {
   completed: false,
   testing: false,
   rig: null,
-  lastResult: null
+  lastResult: null,
+  activeTargetLoad: null,
+  lastDamageStage: "elastic"
 };
 
 const CONTROL_NAMES = {
@@ -72,6 +75,7 @@ function setMode(next) {
   const build = next === "build";
   const inspect = next === "inspect";
   if (build && settings.completed) {
+    settings.rig?.resetDamage();
     settings.current.forceKN = 0;
     settings.completed = false;
     settings.lastResult = null;
@@ -108,6 +112,8 @@ function setChallenge(index) {
   settings.targetLoad = challenge.loadKN;
   settings.completed = false;
   settings.lastResult = null;
+  settings.activeTargetLoad = null;
+  settings.rig?.resetDamage();
   updateChallengeHeader();
   updateSliderValues();
   setMode("ready");
@@ -123,9 +129,16 @@ function updateLearning(mechanics, result) {
   let title = "Where is stress highest?";
   let explanation = "For a cantilever loaded at its tip, the maximum bending moment occurs at the fixed end. The outer fibers carry the greatest bending stress.";
   const challenge = CHALLENGES[settings.challengeIndex];
-  if (mechanics.yieldUtilization >= 0.9999) {
-    title = "At the first-yield limit";
-    explanation = "The linear-elastic model has reached its validity limit. A real beam may plastically deform; permanent deformation, fracture and buckling are not simulated here.";
+  const damage = damageState(settings.current, settings.current.forceKN);
+  if (damage.isSeparated) {
+    title = "Rupture and loss of load path";
+    explanation = "The illustrative tear has separated the beam near its fixed end. The hydraulic actuator can complete its commanded stroke, but the detached specimen no longer carries that load. Fracture location and load are not validated.";
+  } else if (damage.stage === "tearing" || damage.stage === "cracking") {
+    title = "The crack is propagating";
+    explanation = "This illustrative damage model grows a crack on the tension flange and through the web. Real tearing would require material plasticity, crack-tip mechanics and calibrated fracture data.";
+  } else if (damage.isBeyondElastic) {
+    title = "Permanent deformation begins at yield";
+    explanation = "The beam has passed first yield. The numerical displacement and stress are elastic trial extrapolations; the extra bending shown is a stylized plastic hinge, not a calibrated nonlinear solution.";
   } else if (!result.meetsStrength) {
     title = "Strength margin too small";
     explanation = "The section has not yielded, but its factor of safety is below " + challenge.targetFactor.toFixed(1) + ". A deeper section can reduce bending stress.";
@@ -149,7 +162,20 @@ function renderAnalysis() {
   try {
     const mechanics = beamAnalysis(config);
     const solution = getBeamSolution(config);
-    settings.rig.updateBeam(config, mechanics, solution, settings.heatmap);
+    const damage = damageState(config, config.forceKN);
+    settings.rig.updateBeam(config, mechanics, solution, settings.heatmap, damage);
+    $("game").dataset.damageStage = damage.stage;
+    if (settings.testing && damage.stage !== settings.lastDamageStage) {
+      const captions = {
+        elastic: "Elastic response",
+        yielding: "First yield — permanent bending begins",
+        cracking: "A crack is opening on the tension flange",
+        tearing: "The crack is tearing through the web",
+        ruptured: "Specimen separated — actuator command continues"
+      };
+      setStatus(captions[damage.stage] || "Loading specimen", damage.isSeparated ? "failed" : "testing");
+      settings.lastDamageStage = damage.stage;
+    }
 
     const result = checkChallenge(config, CHALLENGES[settings.challengeIndex], config.forceKN);
     setMetric("stressMetric", mechanics.maxStressPa / 1e6, "MPa");
@@ -159,15 +185,18 @@ function renderAnalysis() {
     $("safetyMetric").textContent = n(mechanics.factorOfSafety, 2) + "×";
     $("strainMetric").textContent = Math.round(mechanics.bendingStrain * 1e6).toLocaleString() + " µε";
     $("canvasForce").textContent = n(config.forceKN, 1) + " kN";
-    $("solverLabel").textContent = solution.engine;
+    $("solverLabel").textContent = damage.isBeyondElastic
+      ? solution.engine + " · elastic trial"
+      : solution.engine;
     $("loadOutput").textContent = n(config.forceKN, 1) + " kN";
-    $("loadTarget").textContent = n(settings.targetLoad, 1) + " kN test";
-    $("miniLoadFill").style.width = Math.max(0, Math.min(100, config.forceKN / Math.max(settings.targetLoad, 0.1) * 100)) + "%";
+    const commandKN = settings.activeTargetLoad ?? settings.targetLoad;
+    $("loadTarget").textContent = n(commandKN, 1) + " kN command";
+    $("miniLoadFill").style.width = Math.max(0, Math.min(100, config.forceKN / Math.max(commandKN, 0.1) * 100)) + "%";
     $("targetMarker").style.left = "calc(100% - 2px)";
     $("heatToggle").setAttribute("aria-pressed", String(settings.heatmap));
     $("heatToggleLabel").textContent = settings.heatmap ? "STRESS MAP" : "REAL MATERIAL";
     updateLearning(mechanics, result);
-    return { mechanics, result, solution };
+    return { mechanics, result, solution, damage };
   } catch (error) {
     console.error("Beam analysis failed", error);
     setStatus("Physics calculation unavailable", "failed");
@@ -204,40 +233,52 @@ function updateGeometry(key, value) {
   renderNextFrame();
 }
 
-function announceResult(data, stoppedAtYield) {
+function announceResult(data, destructive = false) {
   if (!data) return;
-  const { mechanics, result } = data;
+  const { mechanics, result, damage } = data;
   settings.completed = true;
   settings.lastResult = result;
-  const success = result.pass && !stoppedAtYield;
-  const exceeded = stoppedAtYield || mechanics.yieldUtilization >= 0.9999;
+  const success = result.pass && !damage.isBeyondElastic && !destructive;
+  const ruptured = damage.isSeparated;
   $("game").dataset.mode = "complete";
   settings.mode = "complete";
   $("resultCard").hidden = false;
   $("resultCard").classList.toggle("failed", !success);
   $("resultIcon").textContent = success ? "✓" : "!";
-  $("resultTitle").textContent = success ? "CHALLENGE PASSED" : exceeded ? "FIRST YIELD REACHED" : !result.completedLoad ? "LOAD BELOW TARGET" : !result.meetsStrength ? "SAFETY MARGIN TOO LOW" : "TOO MUCH DEFLECTION";
-  $("resultDetail").textContent = success
-    ? n(settings.targetLoad, 1) + " kN held using " + n(mechanics.massKG, 1) + " kg of material. Try a lighter design."
-    : exceeded
-      ? "The test stopped at the elastic limit. Strengthen the beam and try again."
-      : !result.completedLoad
-        ? "Set the test load to at least " + CHALLENGES[settings.challengeIndex].loadKN + " kN to complete this level."
-        : !result.meetsStrength
-          ? "Increase the yield factor to " + CHALLENGES[settings.challengeIndex].targetFactor.toFixed(1) + " or more."
-          : "Keep tip deflection below " + CHALLENGES[settings.challengeIndex].maxDeflectionMM + " mm.";
-  setStatus(success ? "Success — the beam survived" : "Test finished — inspect the limit", success ? "passed" : "failed");
+  $("resultTitle").textContent = success
+    ? "CHALLENGE PASSED"
+    : ruptured ? "CRACK → TEAR → RUPTURE"
+      : damage.isBeyondElastic ? "PERMANENT DEFORMATION"
+        : !result.completedLoad ? "BELOW CHALLENGE LOAD"
+          : !result.meetsStrength ? "SAFETY MARGIN TOO LOW" : "TOO MUCH DEFLECTION";
+  $("resultDetail").textContent = ruptured
+    ? "The actuator completed " + n(settings.current.forceKN, 1) + " kN of command. The specimen separated near " + n(damage.ruptureLoadKN, 1) + " kN in the illustrative damage model; it no longer transmits the commanded load."
+    : success
+      ? n(settings.current.forceKN, 1) + " kN held using " + n(mechanics.massKG, 1) + " kg. Can you make it lighter?"
+      : damage.isBeyondElastic
+        ? "Full " + n(settings.current.forceKN, 1) + " kN command completed. First yield exceeded; the nonlinear deformation shown is illustrative."
+        : !result.completedLoad
+          ? "Set at least " + CHALLENGES[settings.challengeIndex].loadKN + " kN for this level."
+          : !result.meetsStrength
+            ? "Increase yield safety factor to " + CHALLENGES[settings.challengeIndex].targetFactor.toFixed(1) + "."
+            : "Keep the tip within " + CHALLENGES[settings.challengeIndex].maxDeflectionMM + " mm.";
+  setStatus(success ? "Success — structure survived" : ruptured ? "Ruptured — inspect the fracture" : "Limit exceeded — improve your design", success ? "passed" : "failed");
   $("testLabel").textContent = "RETEST";
   $("testIcon").textContent = "↻";
   $("modeTest").disabled = false;
   $("modeTest").setAttribute("aria-pressed", "false");
   $("resultCard").querySelector("#nextChallenge").hidden = !success;
+  $("breakTest").hidden = ruptured;
+  settings.activeTargetLoad = null;
 }
 
 let testFrame = 0;
-function runTest() {
+let finishTimer = null;
+function runTest({ destructive = false } = {}) {
   if (settings.testing || !settings.rig) return;
   cancelAnimationFrame(testFrame);
+  if (finishTimer !== null) clearTimeout(finishTimer);
+  settings.rig.resetDamage();
   closeFloatingMenu();
   $("helpPanel").hidden = true;
   $("buildSheet").hidden = true;
@@ -247,34 +288,35 @@ function runTest() {
   settings.testing = true;
   settings.completed = false;
   settings.mode = "testing";
-  settings.heatmap = true;
+  settings.heatmap = false; // Let the material tear visibly instead of hiding detail behind rainbow colors.
+  settings.lastDamageStage = "elastic";
   $("game").dataset.mode = "testing";
   $("modeTest").disabled = true;
   $("modeTest").setAttribute("aria-pressed", "true");
   $("modeBuild").setAttribute("aria-pressed", "false");
   $("modeInspect").setAttribute("aria-pressed", "false");
   $("testIcon").textContent = "●";
-  $("testLabel").textContent = "LOADING";
+  $("testLabel").textContent = destructive ? "OVERLOAD" : "LOADING";
   settings.current.forceKN = 0;
+  const actualTarget = destructive
+    ? destructiveTargetKN(settings.current, settings.targetLoad)
+    : settings.targetLoad;
+  settings.activeTargetLoad = actualTarget;
   renderAnalysis();
   settings.rig.setViewForMode("testing", settings.current);
-  setStatus("Hydraulic test running", "testing");
+  setStatus(destructive ? "Destructive test — applying overload" : "Hydraulic test — applying commanded load", "testing");
 
-  // The structural solver is elastic-only. Stop loading when it reaches first yield.
-  const reference = beamAnalysis({ ...settings.current, forceKN: settings.targetLoad });
-  const ratioAtTarget = reference.yieldUtilization;
-  const stopAtYield = ratioAtTarget >= 1;
-  const actualTarget = stopAtYield
-    ? settings.targetLoad / ratioAtTarget
-    : settings.targetLoad;
-  const duration = prefersReducedMotion ? 420 : 2200;
+  // Complete the commanded load rather than stopping at first yield. For damage
+  // this is the actuator command, NOT the transmitted load after separation.
+  const duration = prefersReducedMotion ? 650 : 3550;
   let start = 0;
   let lastRender = -100;
   const animate = (timestamp) => {
     if (!start) start = timestamp;
     const progress = Math.min(1, (timestamp - start) / duration);
+    // Gentle opening, slower loading near the crack/tearing thresholds.
     const eased = progress * progress * (3 - 2 * progress);
-    if (timestamp - lastRender >= 40 || progress >= 1) {
+    if (timestamp - lastRender >= 34 || progress >= 1) {
       settings.current.forceKN = actualTarget * eased;
       renderAnalysis();
       lastRender = timestamp;
@@ -283,9 +325,13 @@ function runTest() {
       testFrame = requestAnimationFrame(animate);
     } else {
       settings.current.forceKN = actualTarget;
-      const outcome = renderAnalysis();
-      settings.testing = false;
-      announceResult(outcome, stopAtYield);
+      renderAnalysis();
+      finishTimer = setTimeout(() => {
+        const outcome = renderAnalysis();
+        settings.testing = false;
+        finishTimer = null;
+        announceResult(outcome, destructive);
+      }, prefersReducedMotion ? 120 : 1150);
     }
   };
   testFrame = requestAnimationFrame(animate);
@@ -332,17 +378,21 @@ function attachHandleDrag(buttonId, key, factor) {
 function connectControls() {
   $("modeBuild").addEventListener("click", () => setMode(settings.mode === "build" ? "ready" : "build"));
   $("modeInspect").addEventListener("click", () => setMode(settings.mode === "inspect" ? "ready" : "inspect"));
-  $("modeTest").addEventListener("click", runTest);
+  $("modeTest").addEventListener("click", () => runTest());
   $("closeBuild").addEventListener("click", () => setMode("ready"));
   $("closeInspect").addEventListener("click", () => setMode("ready"));
-  $("retryTest").addEventListener("click", runTest);
+  $("retryTest").addEventListener("click", () => runTest());
+  $("breakTest").addEventListener("click", () => runTest({ destructive: true }));
+  $("destructiveTest").addEventListener("click", () => runTest({ destructive: true }));
   $("editAgain").addEventListener("click", () => setMode("build"));
   $("nextChallenge").addEventListener("click", () => setChallenge(settings.challengeIndex + 1));
   $("challengeNext").addEventListener("click", () => setChallenge(settings.challengeIndex + 1));
   $("resetBeam").addEventListener("click", () => {
     const challenge = CHALLENGES[settings.challengeIndex];
+    settings.rig?.resetDamage();
     settings.current = { ...STARTER, length: challenge.span, forceKN: 0 };
     settings.targetLoad = challenge.loadKN;
+    settings.activeTargetLoad = null;
     settings.completed = false;
     updateChallengeHeader();
     updateSliderValues();

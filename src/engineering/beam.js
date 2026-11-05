@@ -9,6 +9,7 @@ export const MATERIALS = Object.freeze({
     name: "Structural steel",
     youngsModulus: 200e9,
     yieldStrength: 250e6,
+    ultimateStrength: 400e6,
     density: 7850,
     color: 0x8796a3
   }),
@@ -17,6 +18,7 @@ export const MATERIALS = Object.freeze({
     name: "Aluminum alloy",
     youngsModulus: 69e9,
     yieldStrength: 150e6,
+    ultimateStrength: 260e6,
     density: 2700,
     color: 0xa7b3c4
   })

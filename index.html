@@ -78,6 +78,7 @@
           <button id="editAgain" type="button" class="subtle-button">✎ Improve</button>
           <button id="nextChallenge" type="button" class="subtle-button highlight">Next ›</button>
         </div>
+        <button id="breakTest" type="button" class="break-action">⚡ OVERLOAD UNTIL IT BREAKS</button>
       </section>
 
       <div id="sceneLoading" class="scene-loading" role="status">
@@ -103,6 +104,8 @@
         <div class="range-block"><label for="width">Flange width <output id="widthOutput">120 mm</output></label><input type="range" id="width" min="0.07" max="0.2" step="0.005" value="0.12"></div>
         <div class="sheet-row"><span>Estimated mass</span><strong id="buildMass">— kg</strong></div>
         <button id="resetBeam" class="secondary-button" type="button">↻ Reset design</button>
+        <button id="destructiveTest" class="break-action" type="button">⚡ BREAK IT — DESTRUCTIVE TEST</button>
+        <p class="fine-print">Overload mode drives beyond the illustrative rupture threshold. The real material's fracture load is not predicted.</p>
       </section>
 
       <section id="inspectSheet" class="tool-sheet" aria-label="Inspection and learning" hidden>
@@ -127,7 +130,7 @@
         <p><b>Build</b> — tap the beam or drag handles to change its shape. The bottom editor provides precise dimensions.</p>
         <p><b>Test</b> — the hydraulic ram gradually loads the beam. It stops at the chosen target or the first-yield threshold.</p>
         <p><b>Inspect</b> — examine stress, elastic strain, deflection and yield safety factor. Drag the scene to orbit; pinch to zoom.</p>
-        <p>Linear elastic Euler–Bernoulli beam model. Yield is a limit alert; plastic deformation, buckling and fracture are not simulated. The view can exaggerate deflection. Not for structural design.</p>
+        <p>Linear-elastic Euler–Bernoulli calculations remain the verified baseline. After first yield, extra bending, crack growth, tearing and separation are an <b>illustrative gameplay damage model</b>, not validated nonlinear FEA. The displayed command after fracture is not force carried by the detached beam. Never use the visual failure threshold for structural design.</p>
       </div>
 
       <nav class="mode-dock" aria-label="Game modes">

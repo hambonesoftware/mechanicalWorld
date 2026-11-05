@@ -70,3 +70,35 @@ test("failure is explained, camera controls and challenge selection remain reach
   await page.locator("#challengeNext").click();
   await expect(page.locator("#labChip")).toContainText("LAB 02");
 });
+
+test("full commanded overload shows cracking, tearing and a detached specimen", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "iphone-portrait", "One complete destructive run validates the shared scene.");
+  await waitForLab(page);
+  await page.locator("#modeBuild").click();
+  await page.locator("#targetLoadControl").evaluate((node) => {
+    node.value = "60";
+    node.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator("#targetLoadOutput")).toContainText("60.0");
+  await page.locator("#modeTest").click();
+  await expect(page.locator("#resultCard")).toBeVisible({ timeout: 18_000 });
+  await expect(page.locator("#resultTitle")).toContainText("RUPTURE");
+  await expect(page.locator("#canvasForce")).toHaveText("60.0 kN");
+  await expect(page.locator("#game")).toHaveAttribute("data-damage-stage", "ruptured");
+  await expect(page.locator("#resultDetail")).toContainText("no longer transmits");
+  await page.screenshot({ path: "test-results/iphone-portrait-ruptured.png" });
+  await page.locator("#editAgain").click();
+  await expect(page.locator("#game")).toHaveAttribute("data-damage-stage", "elastic");
+});
+
+test("Break It mode surpasses a safe 12 kN command until rupture", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "iphone-portrait", "One complete destruction test is sufficient.");
+  await waitForLab(page);
+  await page.locator("#modeBuild").click();
+  await page.locator("#destructiveTest").click();
+  await expect(page.locator("#resultCard")).toBeVisible({ timeout: 18_000 });
+  await expect(page.locator("#resultTitle")).toContainText("RUPTURE");
+  const fullCommand = await page.locator("#canvasForce").innerText();
+  expect(parseFloat(fullCommand)).toBeGreaterThan(12);
+  await expect(page.locator("#resultDetail")).toContainText("actuator completed");
+});

@@ -163,3 +163,18 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
 
 /* Contextual display: stress overlay controls belong to Inspect, not Build. */
 .app-shell:not([data-mode="inspect"]) .scene-floating-actions{display:none}
+
+/* Destructive experiment belongs to a distinct, highly legible control. */
+.break-action{
+  width:100%;min-height:48px;margin-top:11px;border:1px solid #ffbd80;border-radius:10px;
+  color:#1c1d21;background:linear-gradient(100deg,#ffd28b,#f28a5d);
+  font:800 12px "DM Sans",sans-serif;letter-spacing:.85px;box-shadow:0 5px 16px #ec784c35
+}
+.break-action:hover{filter:brightness(1.07)}
+.break-action:active{transform:scale(.99)}
+.result-card{max-height:min(48dvh,365px);overflow-y:auto;overscroll-behavior:contain}
+.result-heading p{max-height:115px;overflow:auto}
+.app-shell[data-damage-stage="cracking"] .status-pill,
+.app-shell[data-damage-stage="tearing"] .status-pill{border-color:#f1aa6c}
+.app-shell[data-damage-stage="ruptured"] .status-pill{border-color:#ff8775}
+@media(max-height:650px){.result-card{max-height:60dvh}}

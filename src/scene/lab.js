@@ -19,6 +19,9 @@ const MATERIALS = {
   floor: metal(0x213441, 0.95, 0.04),
   beam: metal(0x9caebc, 0.37),
   aluminum: metal(0xc4cdd4, 0.25, 0.78),
+  fracture: new THREE.MeshStandardMaterial({ color: 0x572c28, metalness: 0.42, roughness: 0.86 }),
+  crackDark: new THREE.MeshBasicMaterial({ color: 0x120e11, depthTest: false }),
+  crackEdge: new THREE.MeshBasicMaterial({ color: 0xffa14c, depthTest: false }),
   heat: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.38, roughness: 0.47, side: THREE.DoubleSide }),
   glass: new THREE.MeshPhysicalMaterial({ color: 0xaedce3, roughness: 0.1, metalness: 0.12, transparent: true, opacity: 0.22, depthWrite: false })
 };
@@ -91,7 +94,7 @@ function stressColor(utilization) {
  * Longitudinal and transverse subdivisions support physically meaningful
  * bending deformation and stress colors, without imported mesh assets.
  */
-function createDeformedStrip(length, h, width, centerY, config, mechanics, displacementAt) {
+function createDeformedStrip(length, h, width, centerY, config, mechanics, displacementAt, damage = null) {
   const geometry = new THREE.BoxGeometry(length, h, width, 68, 8, 2);
   const positions = geometry.attributes.position;
   const colors = new Float32Array(positions.count * 3);
@@ -100,8 +103,10 @@ function createDeformedStrip(length, h, width, centerY, config, mechanics, displ
   for (let i = 0; i < positions.count; i += 1) {
     const x = clamp(positions.getX(i) + length / 2, 0, length);
     const localY = positions.getY(i) + centerY;
-    const currentDeflection = displacementAt(x) * deformationScale;
-    const currentRotation = mechanics.rotationAt(x) * deformationScale;
+    const currentDeflection = displacementAt(x) * deformationScale
+      - (damage?.plasticVisual || 0) * 0.12 * Math.pow(x / config.length, 1.4);
+    const currentRotation = mechanics.rotationAt(x) * deformationScale
+      - (damage?.plasticVisual || 0) * 0.11 * Math.pow(x / config.length, 0.6);
     const translatedX = positions.getX(i) - Math.sin(currentRotation) * localY;
     const translatedY = centerY + positions.getY(i) * Math.cos(currentRotation) + currentDeflection;
     positions.setXYZ(i, translatedX, translatedY, positions.getZ(i));
@@ -202,6 +207,15 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   beamGroup.position.set(BASE_X, BEAM_Y, 0);
   machineGroup.add(beamGroup);
   const stripMeshes = [];
+  const crackGroup = new THREE.Group();
+  beamGroup.add(crackGroup);
+  const damageDebris = new THREE.Group();
+  scene.add(damageDebris);
+  let brokenBody = null;
+  let brokenVisual = null;
+  let brokenFallbackTime = 0;
+  let fractureStarted = false;
+  let lastCrackStep = -1;
 
   let rapier = null;
   let world = null;
@@ -246,9 +260,151 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     return true;
   }
 
-  function updateBeam(config, mechanics, solution, showHeatmap) {
+
+  function removeDynamicMeshes(group) {
+    for (const child of [...group.children]) {
+      group.remove(child);
+      child.traverse((part) => {
+        if (part.geometry) part.geometry.dispose();
+      });
+    }
+  }
+
+  function resetDamage() {
+    if (brokenBody && world) {
+      world.removeRigidBody(brokenBody);
+    }
+    brokenBody = null;
+    brokenVisual = null;
+    fractureStarted = false;
+    brokenFallbackTime = 0;
+    lastCrackStep = -1;
+    removeDynamicMeshes(damageDebris);
+    removeDynamicMeshes(crackGroup);
+    beamGroup.visible = true;
+  }
+
+  function addJaggedCrack(points, material, radius = 0.0045) {
+    if (points.length < 2) return;
+    const curve = new THREE.CatmullRomCurve3(points);
+    const tube = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, Math.max(5, points.length * 4), radius, 5, false),
+      material
+    );
+    tube.renderOrder = 15;
+    crackGroup.add(tube);
+  }
+
+  function updateCrack(config, damage) {
+    const crackStep = Math.floor((damage.crackProgress + damage.tearProgress) * 18);
+    if (lastCrackStep === crackStep) return;
+    lastCrackStep = crackStep;
+    removeDynamicMeshes(crackGroup);
+    if (damage.crackProgress <= 0 && damage.tearProgress <= 0) return;
+    const cutX = 0.23;
+    const yTop = config.depth / 2 + 0.004;
+    const depthZ = config.width / 2;
+    const extend = 0.10 + damage.crackProgress * 0.90;
+    const jagged = [];
+    for (let i = 0; i <= 12; i += 1) {
+      const t = i / 12;
+      if (t > extend) break;
+      const z = -depthZ + config.width * t;
+      const jitter = 0.007 * Math.sin(i * 2.74 + 0.3) * Math.sin(t * Math.PI);
+      jagged.push(new THREE.Vector3(cutX + jitter, yTop, z));
+    }
+    if (jagged.length >= 2) {
+      addJaggedCrack(jagged, MATERIALS.crackDark, 0.009);
+      addJaggedCrack(jagged.map(p => new THREE.Vector3(p.x + 0.002, p.y + 0.003, p.z)), MATERIALS.crackEdge, 0.0028);
+    }
+    // Tear descends from the tension flange through the web; this is a visual,
+    // art-directed crack front, NOT an evaluated fracture-path solution.
+    if (damage.tearProgress > 0) {
+      const webPoints = [];
+      const tearDepth = damage.tearProgress * 0.97;
+      for (let i = 0; i <= 15; i += 1) {
+        const t = i / 15;
+        if (t > tearDepth) break;
+        webPoints.push(new THREE.Vector3(
+          cutX + Math.sin(t * 12.4) * 0.006,
+          config.depth / 2 - config.flangeThickness - t * (config.depth - config.flangeThickness),
+          config.webThickness / 2 + 0.005
+        ));
+      }
+      addJaggedCrack(webPoints, MATERIALS.crackDark, 0.010);
+      addJaggedCrack(webPoints.map(p => new THREE.Vector3(p.x + 0.003, p.y, p.z + 0.002)), MATERIALS.crackEdge, 0.003);
+    }
+  }
+
+  function makeFragmentStrip(group, length, h, width, centerY, x, material) {
+    box(group, length, h, width, x, centerY, 0, material);
+    const cutThickness = Math.min(0.008, length * 0.15);
+    box(group, cutThickness, h, width, x - length / 2 - cutThickness / 2, centerY, 0, MATERIALS.fracture);
+  }
+
+  function releaseFracture(config) {
+    if (fractureStarted) return false;
+    fractureStarted = true;
+    beamGroup.visible = false;
+    removeDynamicMeshes(crackGroup);
+    const rootLength = Math.min(0.23, config.length * 0.22);
+    const span = Math.max(0.18, config.length - rootLength);
+    const material = config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam;
+    const members = [
+      { h: config.flangeThickness, w: config.width, cy: config.depth / 2 - config.flangeThickness / 2 },
+      { h: config.depth - 2 * config.flangeThickness, w: config.webThickness, cy: 0 },
+      { h: config.flangeThickness, w: config.width, cy: -config.depth / 2 + config.flangeThickness / 2 }
+    ];
+    // Leave a visibly torn-off root in the vise.
+    const root = new THREE.Group();
+    root.position.set(BASE_X, BEAM_Y, 0);
+    damageDebris.add(root);
+    for (const m of members) {
+      makeFragmentStrip(root, rootLength, m.h, m.w, m.cy, rootLength / 2, material);
+    }
+    brokenVisual = new THREE.Group();
+    damageDebris.add(brokenVisual);
+    for (const m of members) {
+      makeFragmentStrip(brokenVisual, span, m.h, m.w, m.cy, 0, material);
+    }
+    const spawnX = BASE_X + rootLength + span / 2;
+    const spawnY = BEAM_Y - 0.09;
+    brokenVisual.position.set(spawnX, spawnY, 0);
+    if (world && rapier) {
+      brokenBody = world.createRigidBody(
+        rapier.RigidBodyDesc.dynamic()
+          .setTranslation(spawnX, spawnY, 0)
+          .setLinvel(0.25, -0.25, 0.18)
+          .setAngvel(0.2, 0, -1.1)
+          .setLinearDamping(0.15)
+          .setAngularDamping(0.22)
+          .setCcdEnabled(true)
+      );
+      world.createCollider(
+        rapier.ColliderDesc.cuboid(span / 2, config.depth / 2, config.width / 2)
+          .setDensity(0.35)
+          .setRestitution(0.07)
+          .setFriction(0.78),
+        brokenBody
+      );
+      brokenBody.applyImpulse({ x: 0.12, y: -0.12, z: 0.04 }, true);
+    } else {
+      brokenFallbackTime = 0.001;
+    }
+    return true;
+  }
+
+  function updateBeam(config, mechanics, solution, showHeatmap, damage = null) {
     lastConfig = { ...config };
-    lastTipDeflection = solution.tipDeflectionM * config.deformationScale;
+    lastTipDeflection = solution.tipDeflectionM * config.deformationScale
+      - (damage?.plasticVisual || 0) * 0.12;
+    if (damage?.isSeparated) {
+      releaseFracture(config);
+      return { overstress: true, separated: true };
+    }
+    if (fractureStarted) return { overstress: true, separated: true };
+    beamGroup.visible = true;
+    updateCrack(config, damage || { crackProgress: 0, tearProgress: 0 });
     const oldMeshes = [...stripMeshes];
     for (const mesh of oldMeshes) {
       beamGroup.remove(mesh);
@@ -262,7 +418,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     ];
     for (const strip of strips) {
       const geometry = createDeformedStrip(
-        config.length, strip.h, strip.w, strip.y, config, mechanics, solution.displacementAt
+        config.length, strip.h, strip.w, strip.y, config, mechanics, solution.displacementAt, damage
       );
       const mesh = new THREE.Mesh(geometry, showHeatmap ? MATERIALS.heat : config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam);
       mesh.position.x = config.length / 2;
@@ -272,7 +428,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       stripMeshes.push(mesh);
     }
     stand.position.x = BASE_X + config.length;
-    const deflection = solution.tipDeflectionM * config.deformationScale;
+    const deflection = solution.tipDeflectionM * config.deformationScale
+      - (damage?.plasticVisual || 0) * 0.12;
     const contact = BEAM_Y + deflection + config.depth / 2 + 0.05;
     tip.position.y = contact - stand.position.y;
     ram.position.y = contact + 0.37;
@@ -370,12 +527,24 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
         frameAccumulator -= 1 / 60;
         steps += 1;
       }
+      if (brokenBody && brokenVisual) {
+        const tr = brokenBody.translation();
+        const rot = brokenBody.rotation();
+        brokenVisual.position.set(tr.x, tr.y, tr.z);
+        brokenVisual.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+      }
       if (weightBody && weightMesh) {
         const translation = weightBody.translation();
         const rotation = weightBody.rotation();
         weightMesh.position.set(translation.x, translation.y, translation.z);
         weightMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
       }
+    }
+    if (brokenFallbackTime > 0 && brokenVisual) {
+      brokenFallbackTime += dt;
+      const t = brokenFallbackTime;
+      brokenVisual.position.y = Math.max(0.40, BEAM_Y - 0.09 - 2.8 * t * t);
+      brokenVisual.rotation.z = Math.max(-1.2, -t * 1.3);
     }
     resize();
     orbit.update();
@@ -385,6 +554,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
 
   return {
     updateBeam,
+    resetDamage,
+    releaseFracture,
     dropWeight,
     focusCamera,
     setViewForMode,
@@ -393,6 +564,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     dispose() {
       cancelAnimationFrame(animationId);
       orbit.dispose();
+      resetDamage();
       scene.traverse((object) => {
         if (object.geometry) object.geometry.dispose();
         if (object.userData.texture) object.userData.texture.dispose();
