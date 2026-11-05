@@ -44,7 +44,7 @@ test("detached curved fragment matches previous attached position at separation"
     }
   }
 });
-test("elastic small load still appears 8x exaggerated and zero stays zero",()=>{
+test("elastic small load follows the selected visual scale and zero stays zero",()=>{
   const c={...STARTER};
   const base=atLoad(c,0);
   assert.equal(beamVisualPose(c,base,c.length).displacement,0);
@@ -64,4 +64,13 @@ test("elastic FEAScript displacement uses analytical rotation when FEM omits it"
   assert.ok(pose.rotation< -0.02,"The section must rotate as it bends");
   const withoutFallback=beamVisualPose(c,model,1);
   assert.equal(withoutFallback.rotation,0);
+});
+
+test("overlarge legacy display scales cannot fold the beam into the floor",()=>{
+  const c={...STARTER,deformationScale:20};
+  const sol=atLoad(c,55);
+  const pose=beamVisualPose(c,sol,c.length);
+  assert.ok(pose.bottomSurfaceY>DISPLAY_FLOOR_TOP+DISPLAY_CLEARANCE_M);
+  const limited=beamVisualPose({...c,deformationScale:3},sol,c.length);
+  assert.ok(Math.abs(pose.displacement-limited.displacement)<1e-10);
 });

@@ -32,7 +32,7 @@ export const STARTER = Object.freeze({
   flangeThickness: 0.012,
   webThickness: 0.008,
   forceKN: 12,
-  deformationScale: 8
+  deformationScale: 2
 });
 
 export const CHALLENGES = Object.freeze([

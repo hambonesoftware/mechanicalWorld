@@ -111,3 +111,27 @@ Mobile browser QA now captures an intermediate tearing frame, checks that
 yield/crack/tear/rupture were encountered in order, and samples display floor
 clearance throughout the ramp. Numerical tests cover visual continuity and
 clearance at 20x deformation across multiple section depths.
+
+
+## REDLINE v2.2 — real visible mesh opening before complete failure
+
+The fracture renderer is now a **layered geometric separation**, not a
+decorative line marking a future tear. When the localized damage front crosses
+a flange or web layer, that layer becomes two separate watertight meshes with
+a physical slit and dark rough exposed faces. Layers not yet reached by the
+front remain continuous and carry the visible connection. The fracture begins
+in the upper flange, progresses through the web, and finally removes the lower
+ligament; the final detached root/free fragments use the same layered seam
+and curved centerline, eliminating the previous magic swap.
+
+The force thresholds are still deliberately illustrative and **not**
+calibrated crack-growth mechanics; numerical elastoplastic bending remains
+a one-dimensional fiber model. The 3D mesh opening is a concrete geometric
+animation of that failure model, not a structural prediction.
+
+The default teaching deformation exaggeration is reduced from 8× to 2×,
+with an adjustable 1×–3× slider. Legacy values above 3× are clamped in the
+renderer only. This avoids folding the specimen unnaturally toward the
+machine floor while preserving the computed load, deflection and permanent
+set metrics. Mobile regression tests now require actual disconnected
+fracture faces and a measurable opening *during* tearing.

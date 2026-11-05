@@ -98,10 +98,22 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
     const observer = new MutationObserver(record);
     observer.observe(game, { attributes: true, attributeFilter: ["data-damage-stage"] });
     const sample = () => {
+      const stage = game.dataset.damageStage;
       const status = window.redlineVisualDebug?.();
       if (status && Number.isFinite(status.lowestDisplayedSurface)) {
         window.redlineFailureAudit.minimumY = Math.min(window.redlineFailureAudit.minimumY, status.lowestDisplayedSurface);
         window.redlineFailureAudit.samples += 1;
+        window.redlineFailureAudit.openFaces = Math.max(
+          window.redlineFailureAudit.openFaces || 0, status.actualOpenFaces || 0
+        );
+        window.redlineFailureAudit.maxGap = Math.max(
+          window.redlineFailureAudit.maxGap || 0, status.fractureMaximumOpening || 0
+        );
+        if (stage === "tearing") {
+          window.redlineFailureAudit.tearFaces = Math.max(
+            window.redlineFailureAudit.tearFaces || 0, status.actualOpenFaces || 0
+          );
+        }
       }
     };
     window.redlineFailureAudit.stop = () => {
@@ -121,6 +133,9 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
   await expect.poll(async () => page.evaluate(() =>
     window.redlineFailureAudit.stages.includes("tearing")
   ), { timeout: 14_000 }).toBe(true);
+  await expect.poll(async () => page.evaluate(() =>
+    window.redlineVisualDebug?.().actualOpenFaces || 0
+  ), { timeout: 3000 }).toBeGreaterThan(8);
   await page.screenshot({ path: "test-results/iphone-portrait-during-tear.png" });
   await expect(page.locator("#resultCard")).toBeVisible({ timeout: 18_000 });
   await expect(page.locator("#resultTitle")).toContainText("RUPTURE");
@@ -133,11 +148,19 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
       stages: window.redlineFailureAudit.stages,
       minimumY: window.redlineFailureAudit.minimumY,
       samples: window.redlineFailureAudit.samples,
+      openFaces: window.redlineFailureAudit.openFaces,
+      tearFaces: window.redlineFailureAudit.tearFaces,
+      maxGap: window.redlineFailureAudit.maxGap,
       scene: window.redlineVisualDebug?.()
     };
   });
   expect(audit.stages).toEqual(expect.arrayContaining(["yielding", "cracking", "tearing", "ruptured"]));
   expect(audit.samples).toBeGreaterThan(10);
+  // This distinguishes actual disconnected material faces from a painted
+  // line on an otherwise continuous beam.
+  expect(audit.tearFaces).toBeGreaterThan(8);
+  expect(audit.openFaces).toBeGreaterThan(15);
+  expect(audit.maxGap).toBeGreaterThan(0.02);
   expect(audit.minimumY).toBeGreaterThan(0.32);
   expect(audit.scene.floorTop).toBeCloseTo(0.28);
   expect(audit.scene.ruptureInitialLowestY).toBeGreaterThan(0.28);

@@ -3,7 +3,7 @@
  *
  * The fiber solver computes the unconstrained beam displacement. The scene
  * exaggerates that displacement for teaching; without a display constraint
- * an 8x drawing can penetrate the machine's top plate even though the beam
+ * heavy display exaggeration can penetrate the machine's top plate even though the beam
  * never contacts a physical floor in the 1D bending model.
  *
  * These functions act ONLY on the 3D display. They do not change measured
@@ -24,7 +24,9 @@ export function beamVisualPose(config, solution, x, options = {}) {
   const maxDownward = beamY - floorTop - config.depth / 2 - clearance;
   if (!(maxDownward > 0)) throw new RangeError("Insufficient machine clearance");
   const hasPlastic = Number.isFinite(solution.maxPlasticStrain);
-  const deformationScale = config.deformationScale;
+  // Preserve the teaching slider but limit extreme cartoon bending.
+  // Numerical tip deflection, permanent set and stress remain unchanged.
+  const deformationScale = Math.min(3, Math.max(1, config.deformationScale));
   const visualExtra = hasPlastic ? 0 : (options.plasticVisual ?? 0) * 0.12 * (position / length) ** 1.4;
   const raw = solution.displacementAt(position) * deformationScale - visualExtra;
   const slope = (solution.rotationAt

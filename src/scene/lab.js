@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { beamVisualPose, beamVisualPoint, fragmentVisualPoint, DISPLAY_FLOOR_TOP } from "./deformation.js";
+import { beamVisualPose, fragmentVisualPoint, DISPLAY_FLOOR_TOP } from "./deformation.js";
+import { fractureBandPlan, fractureCutX, fractureVertexOffset } from "./fractureGeometry.js";
 
 const BASE_X = -1.53;
 const BEAM_Y = 1.42;
@@ -103,8 +104,8 @@ function createDeformedStrip(length, h, width, centerY, config, mechanics, solut
   const originDisplacement = options.originDisplacement ?? 0;
   const stripLength = rangeEnd - rangeStart;
   if (!(stripLength > 0)) throw new RangeError("Beam strip must have positive length");
-  const subdivisions = Math.max(8, Math.ceil(68 * stripLength / length));
-  const geometry = new THREE.BoxGeometry(stripLength, h, width, subdivisions, 8, 2);
+  const subdivisions = Math.max(6, Math.ceil((options.layered ? 30 : 68) * stripLength / length));
+  const geometry = new THREE.BoxGeometry(stripLength, h, width, subdivisions, options.layered ? 2 : 8, options.layered ? 1 : 2);
   const positions = geometry.attributes.position;
   const colors = new Float32Array(positions.count * 3);
   const yieldStrength = mechanics.material.yieldStrength;
@@ -112,8 +113,15 @@ function createDeformedStrip(length, h, width, centerY, config, mechanics, solut
   for (let i = 0; i < positions.count; i += 1) {
     const x = clamp(positions.getX(i) + (rangeStart + rangeEnd) / 2, 0, length);
     const localY = positions.getY(i) + centerY;
+    const localZ = positions.getZ(i);
     const point = fragmentVisualPoint(config, solution, x, localY, originX, originDisplacement, visualOptions);
-    positions.setXYZ(i, point.x, point.y, positions.getZ(i));
+    if (options.fractureOpening > 0) {
+      const offset = fractureVertexOffset(x, localY, localZ, options.fractureCutX,
+        options.fractureOpening, options.fractureSide === "free");
+      point.x += offset.x;
+      point.y += offset.y;
+    }
+    positions.setXYZ(i, point.x, point.y, localZ);
     const stress = Math.abs(solution.stressAt ? solution.stressAt(x, localY) : mechanics.stressAt(x, localY));
     const color = stressColor(stress / yieldStrength);
     colors[i * 3] = color.r;
@@ -225,6 +233,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let brokenStartY = 0;
   let lastDisplayLowestY = BEAM_Y;
   let ruptureInitialLowestY = null;
+  let fractureLayersOpened = 0;
+  let fractureMaximumOpening = 0;
 
   let rapier = null;
   let world = null;
@@ -293,148 +303,91 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     brokenStartY = 0;
     lastDisplayLowestY = BEAM_Y;
     ruptureInitialLowestY = null;
+    fractureLayersOpened = 0;
+    fractureMaximumOpening = 0;
     lastCrackStep = -1;
     removeDynamicMeshes(damageDebris);
     removeDynamicMeshes(crackGroup);
     beamGroup.visible = true;
   }
 
-  function addJaggedCrack(points, material, radius = 0.0045) {
-    if (points.length < 2) return;
-    const curve = new THREE.CatmullRomCurve3(points);
-    const tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(5, points.length * 4), radius, 5, false),
-      material
-    );
-    tube.renderOrder = 15;
-    crackGroup.add(tube);
-  }
-
-  function updateCrack(config, mechanics, solution, damage) {
-    const crackStep = Math.floor((damage.crackProgress + damage.tearProgress) * 18);
-    if (crackStep === 0 && lastCrackStep === 0) return;
-    lastCrackStep = crackStep;
-    // Crack geometry follows the current bent centerline every load step.
-    // Previously, crack strokes stayed straight in clamp coordinates.
-    removeDynamicMeshes(crackGroup);
-    if (damage.crackProgress <= 0 && damage.tearProgress <= 0) return;
-    const cutX = Math.min(0.23, config.length * 0.22);
-    const topY = config.depth / 2 + 0.004;
-    const depthZ = config.width / 2;
-    const extend = 0.10 + damage.crackProgress * 0.90;
-    const options = { beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0, rotationAt: mechanics.rotationAt };
-    const warp = (x, y, z) => {
-      const point = beamVisualPoint(config, solution, x, y, options);
-      return new THREE.Vector3(point.x, point.y, z);
-    };
-    const jagged = [];
-    for (let i = 0; i <= 18; i++) {
-      const t = i / 18;
-      if (t > extend) break;
-      const z = -depthZ + config.width * t;
-      const jitter = 0.006 * Math.sin(i * 2.74 + 0.3) * Math.sin(t * Math.PI);
-      jagged.push(warp(cutX + jitter, topY, z));
-    }
-    if (jagged.length >= 2) {
-      addJaggedCrack(jagged, MATERIALS.crackDark, 0.0075);
-      addJaggedCrack(jagged.map(point => new THREE.Vector3(point.x + 0.001, point.y + 0.002, point.z)), MATERIALS.crackEdge, 0.002);
-    }
-    if (damage.tearProgress > 0) {
-      const webPoints = [];
-      const tearDepth = damage.tearProgress * 0.98;
-      for (let i = 0; i <= 24; i++) {
-        const t = i / 24;
-        if (t > tearDepth) break;
-        webPoints.push(warp(
-          cutX + Math.sin(t * 12.4) * 0.0045,
-          config.depth / 2 - config.flangeThickness - t * (config.depth - config.flangeThickness),
-          config.webThickness / 2 + 0.005
-        ));
-      }
-      addJaggedCrack(webPoints, MATERIALS.crackDark, 0.0085);
-      addJaggedCrack(webPoints.map(point => new THREE.Vector3(point.x + 0.001, point.y, point.z + 0.002)), MATERIALS.crackEdge, 0.0025);
-    }
-  }
-
-  function jaggedRuptureSurface(parent, x, cy, h, w, side) {
-    const dir = side === "left" ? -1 : 1;
-    const vertices = [];
-    const teeth = 6;
-    // Procedural metal tongues on the flange surface and web edge.
-    // Geometry is a visual tear, not a fracture-mechanics crack path.
-    for (let k = 0; k < teeth; k += 1) {
-      const z0 = -w / 2 + k * w / teeth;
-      const z1 = -w / 2 + (k + 1) * w / teeth;
-      const zmid = (z0 + z1) * 0.5;
-      const length = 0.018 + 0.024 * Math.abs(Math.sin((k + 1) * 2.21 + h * 51));
-      for (const y of [cy - h / 2, cy + h / 2]) {
-        vertices.push(
-          x, y, z0,
-          x, y, z1,
-          x + dir * length, y + (k % 2 === 0 ? 0.004 : -0.004), zmid
-        );
-      }
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.computeVertexNormals();
-    const jagged = new THREE.Mesh(geometry, MATERIALS.tornEdge);
-    jagged.castShadow = true;
-    jagged.renderOrder = 12;
-    parent.add(jagged);
-    if (h > w * 2) {
-      // Thin web: a handful of metal tabs tear vertically along the front face.
-      const webVerts = [];
-      for (let k = 0; k < 5; k += 1) {
-        const y0 = cy - h / 2 + k * h / 5;
-        const y1 = cy - h / 2 + (k + 1) * h / 5;
-        webVerts.push(
-          x, y0, w / 2 + 0.002,
-          x, y1, w / 2 + 0.002,
-          x + dir * (0.018 + 0.013 * (k % 3)), (y0 + y1) / 2, w / 2 + 0.002
-        );
-      }
-      const geometry2 = new THREE.BufferGeometry();
-      geometry2.setAttribute("position", new THREE.Float32BufferAttribute(webVerts, 3));
-      geometry2.computeVertexNormals();
-      parent.add(new THREE.Mesh(geometry2, MATERIALS.tornEdge));
-    }
-  }
-
-  function addCurvedFragment(group, config, mechanics, solution, damage, startX, endX, originX, originDisplacement, side) {
-    const material = config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam;
-    const members = [
-      { h: config.flangeThickness, w: config.width, cy: config.depth / 2 - config.flangeThickness / 2 },
-      { h: config.depth - 2 * config.flangeThickness, w: config.webThickness, cy: 0 },
-      { h: config.flangeThickness, w: config.width, cy: -config.depth / 2 + config.flangeThickness / 2 }
+  function sectionMembers(config) {
+    return [
+      { height: config.flangeThickness, width: config.width,
+        centerY: config.depth / 2 - config.flangeThickness / 2 },
+      { height: config.depth - 2 * config.flangeThickness, width: config.webThickness,
+        centerY: 0 },
+      { height: config.flangeThickness, width: config.width,
+        centerY: -config.depth / 2 + config.flangeThickness / 2 }
     ];
-    const bounds = new THREE.Box3().makeEmpty();
-    for (const member of members) {
-      const geometry = createDeformedStrip(
-        config.length, member.h, member.w, member.cy,
-        config, mechanics, solution, damage,
-        { rangeStart: startX, rangeEnd: endX, originX, originDisplacement }
-      );
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      group.add(mesh);
-      bounds.union(geometry.boundingBox);
+  }
+
+  function addSectionMesh(group, config, mechanics, solution, damage, member, start, end, opts = {}) {
+    const material = opts.heatmap
+      ? MATERIALS.heat : config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam;
+    const geometry = createDeformedStrip(config.length, member.height, member.width,
+      member.centerY, config, mechanics, solution, damage, {
+        rangeStart: start, rangeEnd: end,
+        originX: opts.originX ?? 0,
+        originDisplacement: opts.originDisplacement ?? 0,
+        layered: Boolean(opts.layered),
+        fractureCutX: fractureCutX(config),
+        fractureOpening: opts.opening ?? 0,
+        fractureSide: opts.side ?? "whole"
+      });
+    // BoxGeometry material groups: +X, -X, +Y, -Y, +Z, -Z.
+    // Actual exposed fracture faces appear on disconnected solid geometry.
+    const materials = opts.side === "root"
+      ? [MATERIALS.fracture, material, material, material, material, material]
+      : opts.side === "free"
+        ? [material, MATERIALS.fracture, material, material, material, material]
+        : material;
+    const mesh = new THREE.Mesh(geometry, materials);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    return mesh;
+  }
+
+  function fillLiveBeam(config, mechanics, solution, showHeatmap, damage) {
+    const plan = fractureBandPlan(config, damage);
+    const meshes = [];
+    if (!plan.some(b => b.split)) {
+      for (const member of sectionMembers(config)) {
+        meshes.push(addSectionMesh(beamGroup, config, mechanics, solution, damage,
+          member, 0, config.length, { heatmap: showHeatmap }));
+      }
+      return { meshes, cutCount: 0, maximumOpening: 0 };
     }
-    // Rotate the jagged exposed cross-section into the very same tangent
-    // as the previously continuous beam. No straight replacement geometry.
-    const cutX = side === "right" ? endX : startX;
-    const pose = beamVisualPose(config, solution, cutX, {
-      beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0
-    });
-    const face = new THREE.Group();
-    face.position.set(cutX - originX, pose.displacement - originDisplacement, 0);
-    face.rotation.z = pose.rotation;
-    group.add(face);
-    for (const member of members) {
-      const offset = side === "right" ? 0.004 : -0.004;
-      box(face, 0.008, member.h, member.w, offset, member.cy, 0, MATERIALS.fracture);
-      jaggedRuptureSurface(face, 0, member.cy, member.h, member.w, side === "right" ? "right" : "left");
+    const cut = fractureCutX(config);
+    let cutCount = 0, maximumOpening = 0;
+    for (const band of plan) {
+      const member = { height: band.height, width: band.width, centerY: band.centerY };
+      if (!band.split) {
+        meshes.push(addSectionMesh(beamGroup, config, mechanics, solution, damage,
+          member, 0, config.length, { heatmap: showHeatmap, layered: true }));
+        continue;
+      }
+      cutCount++;
+      maximumOpening = Math.max(maximumOpening, band.opening);
+      meshes.push(addSectionMesh(beamGroup, config, mechanics, solution, damage,
+        member, 0, cut, { heatmap: showHeatmap, layered: true, side: "root", opening: band.opening }));
+      meshes.push(addSectionMesh(beamGroup, config, mechanics, solution, damage,
+        member, cut, config.length, { heatmap: showHeatmap, layered: true, side: "free", opening: band.opening }));
+    }
+    return { meshes, cutCount, maximumOpening };
+  }
+
+  function addCurvedFragment(group, config, mechanics, solution, damage,
+    startX, endX, originX, originDisplacement, side) {
+    const bounds = new THREE.Box3().makeEmpty();
+    for (const band of fractureBandPlan(config, { ...damage, isSeparated: true })) {
+      const member = { height: band.height, width: band.width, centerY: band.centerY };
+      const mesh = addSectionMesh(group, config, mechanics, solution, damage,
+        member, startX, endX, {
+          originX, originDisplacement, layered: true, side, opening: band.opening
+        });
+      bounds.union(mesh.geometry.boundingBox);
     }
     return bounds;
   }
@@ -443,7 +396,6 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     if (fractureStarted) return false;
     fractureStarted = true;
     const rootLength = Math.min(0.23, config.length * 0.22);
-    const span = config.length - rootLength;
     const freeCenter = (rootLength + config.length) / 2;
     const freeCenterBend = beamVisualPose(config, solution, freeCenter, {
       beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0
@@ -524,30 +476,15 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     }
     if (fractureStarted) return { overstress: true, separated: true };
     beamGroup.visible = true;
-    updateCrack(config, mechanics, solution, damage || { crackProgress: 0, tearProgress: 0 });
-    const oldMeshes = [...stripMeshes];
-    for (const mesh of oldMeshes) {
+    for (const mesh of stripMeshes) {
       beamGroup.remove(mesh);
       mesh.geometry.dispose();
     }
     stripMeshes.length = 0;
-    const strips = [
-      { h: config.flangeThickness, w: config.width, y: config.depth / 2 - config.flangeThickness / 2 },
-      { h: config.depth - 2 * config.flangeThickness, w: config.webThickness, y: 0 },
-      { h: config.flangeThickness, w: config.width, y: -config.depth / 2 + config.flangeThickness / 2 }
-    ];
-    for (const strip of strips) {
-      const geometry = createDeformedStrip(
-        config.length, strip.h, strip.w, strip.y, config, mechanics, solution, damage,
-        { rangeStart: 0, rangeEnd: config.length, originX: config.length / 2, originDisplacement: 0 }
-      );
-      const mesh = new THREE.Mesh(geometry, showHeatmap ? MATERIALS.heat : config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam);
-      mesh.position.x = config.length / 2;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      beamGroup.add(mesh);
-      stripMeshes.push(mesh);
-    }
+    const geometryState = fillLiveBeam(config, mechanics, solution, showHeatmap, damage);
+    stripMeshes.push(...geometryState.meshes);
+    fractureLayersOpened = geometryState.cutCount;
+    fractureMaximumOpening = geometryState.maximumOpening;
     stand.position.x = BASE_X + config.length;
     const deflection = lastTipDeflection;
     const contact = BEAM_Y + deflection + config.depth / 2 + 0.05;
@@ -705,7 +642,10 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       movingPieceLowerEstimate: brokenVisual
         ? brokenVisual.position.y + brokenLocalLowestY : null,
       intactBeamVisible: beamGroup.visible,
-      stationaryAndMovingPieces: damageDebris.children.length
+      stationaryAndMovingPieces: damageDebris.children.length,
+      fractureLayersOpened,
+      fractureMaximumOpening,
+      actualOpenFaces: fractureLayersOpened * 2
     };
   }
 
