@@ -52,6 +52,8 @@ function updateSliderValues() {
   $("depthOutput").textContent = Math.round(config.depth * 1000) + " mm";
   $("widthOutput").textContent = Math.round(config.width * 1000) + " mm";
   $("deformationOutput").textContent = config.deformationScale + "×";
+  $("targetLoadControl").value = settings.targetLoad;
+  $("targetLoadOutput").textContent = n(settings.targetLoad, 1) + " kN";
   updateMaterialButtons();
 }
 
@@ -372,6 +374,7 @@ function connectControls() {
   $("dropWeight").addEventListener("click", () => {
     if (!settings.rig?.dropWeight()) setStatus("Rapier is not available", "failed");
   });
+  $("targetLoadControl").addEventListener("input", (event) => updateGeometry("targetLoad", Number(event.currentTarget.value)));
   for (const key of ["length", "depth", "width"]) {
     $(key).addEventListener("input", (event) => updateGeometry(key, Number(event.currentTarget.value)));
   }

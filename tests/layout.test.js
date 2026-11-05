@@ -18,7 +18,7 @@ test("interactive controls have associated labels and required mode anchors", ()
   for (const id of ["modeBuild", "modeTest", "modeInspect", "buildSheet", "inspectSheet", "resultCard", "handleLayer", "lengthHandle", "depthHandle", "loadHandle", "settingsMenu"]) {
     assert.match(html, new RegExp('id="' + id + '"'));
   }
-  for (const name of ["length", "depth", "width", "deformationScale"]) {
+  for (const name of ["length", "depth", "width", "deformationScale", "targetLoadControl"]) {
     assert.match(html, new RegExp('for="' + name + '"'));
     assert.match(html, new RegExp('id="' + name + '"'));
   }
