@@ -291,7 +291,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     const aspect = Math.max(0.32, viewport.width / Math.max(1, viewport.height));
     const fov = THREE.MathUtils.degToRad(camera.fov);
     const horizontalFov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
-    const span = beamOnly ? config.length + 0.65 : 5.5;
+    const span = beamOnly ? config.length + 0.93 : 5.5;
     const vertical = beamOnly ? 1.5 : 2.9;
     const widthFit = span / (2 * Math.tan(horizontalFov / 2)) * 1.08;
     const heightFit = vertical / (2 * Math.tan(fov / 2)) * 1.18;
@@ -322,9 +322,9 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     const tipX = BASE_X + config.length;
     const tipY = BEAM_Y + lastTipDeflection;
     return {
-      length: worldToScreen(new THREE.Vector3(tipX - 0.10, tipY + 0.24, 0.2)),
+      length: worldToScreen(new THREE.Vector3(tipX - 0.10, tipY - 0.19, 0.2)),
       depth: worldToScreen(new THREE.Vector3(BASE_X + Math.min(config.length * 0.39, 0.9), BEAM_Y + config.depth * 0.55 + 0.25, 0.1)),
-      load: worldToScreen(new THREE.Vector3(tipX + 0.10, tipY + 0.81, 0.1))
+      load: worldToScreen(new THREE.Vector3(tipX + 0.08, tipY + 0.46, 0.1))
     };
   }
 

@@ -26,6 +26,12 @@ test("scene remains visible; build, test and inspect work without page scrolling
   await expect(page.locator("#buildSheet")).toBeVisible();
   await expect(page.locator("#handleLayer")).toBeVisible();
   await expect(page.locator("#laboratory")).toBeVisible();
+  await expect(page.locator(".scene-floating-actions")).toBeHidden();
+  if (testInfo.project.name.includes("portrait")) {
+    await expect(page.locator("#lengthHandle")).toBeVisible();
+    await expect(page.locator("#depthHandle")).toBeVisible();
+    await expect(page.locator("#loadHandle")).toBeVisible();
+  }
   const materialButton = page.locator('[data-material="aluminum"]');
   await materialButton.click();
   await expect(materialButton).toHaveAttribute("aria-pressed", "true");

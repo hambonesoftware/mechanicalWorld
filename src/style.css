@@ -160,3 +160,6 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
 
 #inspectSheet{max-height:min(53dvh,470px)}
 @media(min-width:900px){#inspectSheet{max-height:none}}
+
+/* Contextual display: stress overlay controls belong to Inspect, not Build. */
+.app-shell:not([data-mode="inspect"]) .scene-floating-actions{display:none}
