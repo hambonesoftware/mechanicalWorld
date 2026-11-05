@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { STARTER } from "../src/engineering/beam.js";
-import { damageState, destructiveTargetKN, failureEnvelope, failureMilestones } from "../src/engineering/damage.js";
+import { damageState, destructiveTargetKN, failureEnvelope, failureMilestones, preRuptureGeometryLoadKN, stagedActuatorLoad } from "../src/engineering/damage.js";
 
 test("damage phases are increasing and yield does not mean immediate fracture", () => {
   const f = failureEnvelope(STARTER);
@@ -41,4 +41,26 @@ test("milestone values are strictly increasing and damage is bounded", () => {
   const state = damageState(STARTER, 10000);
   assert.equal(state.crackProgress, 1);
   assert.equal(state.tearProgress, 1);
+});
+
+
+test("actuator pacing gives crack and tear visible intervals before rupture",()=>{
+  const envelope = failureEnvelope(STARTER);
+  const target = envelope.ruptureLoadKN * 1.09;
+  const samples = Array.from({length:101},(_,i)=>stagedActuatorLoad(STARTER,target,i/100));
+  assert.equal(samples[0],0);
+  assert.ok(Math.abs(samples[100]-target)<1e-7);
+  for(let i=1;i<samples.length;i++){
+    assert.ok(samples[i]>=samples[i-1]-1e-9,"Actuator command must not move backward");
+  }
+  assert.equal(damageState(STARTER,stagedActuatorLoad(STARTER,target,0.72)).stage,"cracking");
+  assert.equal(damageState(STARTER,stagedActuatorLoad(STARTER,target,0.88)).stage,"tearing");
+  assert.equal(damageState(STARTER,stagedActuatorLoad(STARTER,target,0.98)).stage,"ruptured");
+});
+test("after separation the plastic geometry freezes even when the actuator continues",()=>{
+  const env = failureEnvelope(STARTER);
+  assert.equal(preRuptureGeometryLoadKN(STARTER,12),12);
+  assert.equal(preRuptureGeometryLoadKN(STARTER,60),env.ruptureLoadKN);
+  assert.equal(preRuptureGeometryLoadKN(STARTER,140),env.ruptureLoadKN);
+  assert.throws(()=>preRuptureGeometryLoadKN(STARTER,-1),RangeError);
 });

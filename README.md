@@ -81,3 +81,33 @@ After a non-rupturing test, **Unload** gradually returns the applied force to ze
 The live Three.js beam uses the calculated displacement, rotation and fiber stress through load/unload/reload; display-only deformation is smoothly compressed at extreme angles. In contrast, crack/tear/rupture thresholds and broken-body Rapier motion remain deliberately *illustrative* and not a validated fracture model. This is a simplified small-rotation, small-deflection bending solver and cannot substitute for material coupon data, geometric-nonlinear shell/solid FEA, buckling analysis, cyclic Bauschinger effects, or real structural design calculations. The force displayed after rupture is the **actuator command**, not the force transmitted by the detached beam.
 
 New tests check elastic agreement, onset of plasticity, unload residual, elastic-direction reloading, replay isolation, and the complete mobile test → unload → reload → scrub workflow.
+
+
+## REDLINE v2.1 — continuous bending, visible tearing, matched floor clearance
+
+The physical fiber-beam solver still owns the numerical force/deflection
+history. The deliberately exaggerated drawing now uses a smooth, differentiable
+deformation constraint to ensure its lower flange stays above the actual
+machinery top at y = 0.28 m. This constraint is **display-only**; it does not
+simulate a new physical reaction force or alter any numerical measurement.
+
+The root-end crack is mapped along the same bent centerline as the I-section,
+so it travels with the material rather than appearing as a straight separate
+overlay. Break-It loading provides dedicated, readable intervals for first yield,
+flange crack growth, web tearing and separation. At the exact separation step,
+the intact curved surface is replaced by two matching curved fragments with
+coincident world-space boundaries: one remains in the clamp and the other
+becomes a Rapier rigid body. The previous straight, pre-rotated replacement and
+large fracture impulse are gone.
+
+The visible steel-test platform now matches Rapier's collision plane (0.28 m)
+and the detached curved mesh receives a conservative bounding collider.
+Without Rapier, its gravity-drop fallback stops at the same platform top.
+The numerical specimen geometry is frozen at the illustrative rupture load
+even if the actuator's requested force continues increasing, because the broken
+piece no longer carries load.
+
+Mobile browser QA now captures an intermediate tearing frame, checks that
+yield/crack/tear/rupture were encountered in order, and samples display floor
+clearance throughout the ramp. Numerical tests cover visual continuity and
+clearance at 20x deformation across multiple section depths.

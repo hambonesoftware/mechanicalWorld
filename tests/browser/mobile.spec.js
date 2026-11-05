@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
 
-async function waitForLab(page) {
+async function waitForLab(page, route = "/") {
   const startupError = new Promise((_, reject) => {
     page.once("pageerror", error => reject(new Error("Startup error: " + error.message)));
   });
   const loading = async () => {
-    await page.goto("/");
+    await page.goto(route);
     await expect(page.locator("#sceneLoading")).toBeHidden({ timeout: 35_000 });
     await expect(page.locator("#stressMetric")).not.toContainText("—");
   };
@@ -85,7 +85,32 @@ test("failure is explained, camera controls and challenge selection remain reach
 
 test("full commanded overload shows cracking, tearing and a detached specimen", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "iphone-portrait", "One complete destructive run validates the shared scene.");
-  await waitForLab(page);
+  await waitForLab(page, "/?debug=1");
+  await page.evaluate(() => {
+    window.redlineFailureAudit = { stages: [], minimumY: Infinity, samples: 0 };
+    const game = document.getElementById("game");
+    const record = () => {
+      const stage = game.dataset.damageStage;
+      if (stage && !window.redlineFailureAudit.stages.includes(stage)) {
+        window.redlineFailureAudit.stages.push(stage);
+      }
+    };
+    const observer = new MutationObserver(record);
+    observer.observe(game, { attributes: true, attributeFilter: ["data-damage-stage"] });
+    const sample = () => {
+      const status = window.redlineVisualDebug?.();
+      if (status && Number.isFinite(status.lowestDisplayedSurface)) {
+        window.redlineFailureAudit.minimumY = Math.min(window.redlineFailureAudit.minimumY, status.lowestDisplayedSurface);
+        window.redlineFailureAudit.samples += 1;
+      }
+    };
+    window.redlineFailureAudit.stop = () => {
+      clearInterval(interval);
+      observer.disconnect();
+    };
+    const interval = setInterval(sample, 40);
+    record();
+  });
   await page.locator("#modeBuild").click();
   await page.locator("#targetLoadControl").evaluate((node) => {
     node.value = "60";
@@ -93,11 +118,31 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
   });
   await expect(page.locator("#targetLoadOutput")).toContainText("60.0");
   await page.locator("#modeTest").click();
+  await expect.poll(async () => page.evaluate(() =>
+    window.redlineFailureAudit.stages.includes("tearing")
+  ), { timeout: 14_000 }).toBe(true);
+  await page.screenshot({ path: "test-results/iphone-portrait-during-tear.png" });
   await expect(page.locator("#resultCard")).toBeVisible({ timeout: 18_000 });
   await expect(page.locator("#resultTitle")).toContainText("RUPTURE");
   await expect(page.locator("#canvasForce")).toHaveText("60.0 kN");
   await expect(page.locator("#game")).toHaveAttribute("data-damage-stage", "ruptured");
   await expect(page.locator("#resultDetail")).toContainText("no longer transmits");
+  const audit = await page.evaluate(() => {
+    window.redlineFailureAudit.stop();
+    return {
+      stages: window.redlineFailureAudit.stages,
+      minimumY: window.redlineFailureAudit.minimumY,
+      samples: window.redlineFailureAudit.samples,
+      scene: window.redlineVisualDebug?.()
+    };
+  });
+  expect(audit.stages).toEqual(expect.arrayContaining(["yielding", "cracking", "tearing", "ruptured"]));
+  expect(audit.samples).toBeGreaterThan(10);
+  expect(audit.minimumY).toBeGreaterThan(0.32);
+  expect(audit.scene.floorTop).toBeCloseTo(0.28);
+  expect(audit.scene.ruptureInitialLowestY).toBeGreaterThan(0.28);
+  expect(audit.scene.stationaryAndMovingPieces).toBe(2);
+  expect(audit.scene.intactBeamVisible).toBe(false);
   await page.screenshot({ path: "test-results/iphone-portrait-ruptured.png" });
   await page.locator("#editAgain").click();
   await expect(page.locator("#game")).toHaveAttribute("data-damage-stage", "elastic");

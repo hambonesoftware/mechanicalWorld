@@ -2,7 +2,7 @@ import { STARTER, CHALLENGES, beamAnalysis, checkChallenge } from "./engineering
 import { getBeamSolution } from "./engineering/fem.js";
 import { createPlasticBeam, replayPlasticSnapshot } from "./engineering/plasticity.js";
 import { renderHistoryCurve, historyEntry } from "./ui/history.js";
-import { damageState, destructiveTargetKN } from "./engineering/damage.js";
+import { damageState, destructiveTargetKN, preRuptureGeometryLoadKN, stagedActuatorLoad } from "./engineering/damage.js";
 import { createLaboratory } from "./scene/lab.js";
 import { createPlayHUD } from "./vendor/hambone-play/hambone-play.js";
 
@@ -253,12 +253,18 @@ function renderAnalysis() {
   const config = settings.current;
   try {
     const replay = settings.replayIndex === null ? null : settings.history[settings.replayIndex];
+    // The actuator may continue to its commanded target after fracture, but
+    // the detached specimen no longer accepts further bending load. Keep the
+    // final pre-rupture shape frozen for the gravity-driven fragment.
+    const modeledForceKN = preRuptureGeometryLoadKN(config, config.forceKN);
     const solution = replay
       ? replayPlasticSnapshot(replay.snapshot)
       : settings.plastic
-        ? settings.plastic.stepTo(config.forceKN)
+        ? settings.plastic.stepTo(modeledForceKN)
         : getBeamSolution(config);
-    if (settings.plastic && !replay) storeHistory(solution);
+    if (settings.plastic && !replay && !damageState(config, config.forceKN).isSeparated) {
+      storeHistory(solution);
+    }
     const displayedKN = replay ? solution.forceKN : config.forceKN;
     const mechanics = beamAnalysis(config, displayedKN);
     const peakKN = replay ? solution.peakKN : settings.plastic?.peakKN ?? displayedKN;
@@ -277,8 +283,10 @@ function renderAnalysis() {
         ruptured: "Specimen separated — actuator command continues"
       };
       setStatus(captions[damage.stage] || "Loading specimen", damage.isSeparated ? "failed" : "testing");
-      if (damage.stage !== "elastic") playHUD?.showEvent(captions[damage.stage], {
-        tone: damage.isSeparated ? "danger" : "warning", duration: 1500
+      // Keep the central scene unobstructed during crack and tear growth.
+      // The context label tells the story; only separation gets a brief event.
+      if (damage.isSeparated) playHUD?.showEvent("SPECIMEN SEPARATED", {
+        tone: "danger", duration: 950
       });
       settings.lastDamageStage = damage.stage;
     }
@@ -291,7 +299,9 @@ function renderAnalysis() {
     $("safetyMetric").textContent = n(mechanics.factorOfSafety, 2) + "×";
     $("strainMetric").textContent = Math.round((solution.maxStrain ?? mechanics.bendingStrain) * 1e6).toLocaleString() + " µε";
     $("canvasForce").textContent = n(displayedKN, 1) + " kN";
-    $("solverLabel").textContent = solution.engine + (damage.isBeyondElastic ? " · model, not certified" : "");
+    $("solverLabel").textContent = damage.isSeparated
+      ? solution.engine + " · failed, shape frozen"
+      : solution.engine + (damage.isBeyondElastic ? " · model, not certified" : "");
     $("loadOutput").textContent = n(config.forceKN, 1) + " kN";
     $("residualMetric").textContent = n(Math.abs(solution.permanentTipM || 0) * 1000, 2) + " mm";
     $("plasticMetric").textContent = n((solution.maxPlasticStrain || 0) * 1e6, 0) + " µε";
@@ -443,7 +453,9 @@ function runTest({ destructive = false, cycle = "load" } = {}) {
     const progress = Math.min(1, (timestamp - start) / duration);
     const eased = progress * progress * (3 - 2 * progress);
     if (timestamp - lastRender >= 34 || progress >= 1) {
-      settings.current.forceKN = fromKN + (toKN - fromKN) * eased;
+      settings.current.forceKN = fresh
+        ? stagedActuatorLoad(settings.current, toKN, progress)
+        : fromKN + (toKN - fromKN) * eased;
       renderAnalysis();
       lastRender = timestamp;
     }
@@ -641,6 +653,9 @@ async function main() {
       console.info(status);
     });
     settings.rig.focusCamera(settings.current, true);
+    if (new URLSearchParams(location.search).has("debug")) {
+      window.redlineVisualDebug = () => settings.rig?.getVisualDiagnostics?.();
+    }
     $("sceneLoading").classList.add("hidden");
     renderAnalysis();
     enableBeamSelection();

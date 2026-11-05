@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { beamVisualPose, beamVisualPoint, fragmentVisualPoint, DISPLAY_FLOOR_TOP } from "./deformation.js";
 
 const BASE_X = -1.53;
 const BEAM_Y = 1.42;
@@ -95,30 +96,24 @@ function stressColor(utilization) {
  * Longitudinal and transverse subdivisions support physically meaningful
  * bending deformation and stress colors, without imported mesh assets.
  */
-function createDeformedStrip(length, h, width, centerY, config, mechanics, solution, damage = null) {
-  const geometry = new THREE.BoxGeometry(length, h, width, 68, 8, 2);
+function createDeformedStrip(length, h, width, centerY, config, mechanics, solution, damage = null, options = {}) {
+  const rangeStart = options.rangeStart ?? 0;
+  const rangeEnd = options.rangeEnd ?? length;
+  const originX = options.originX ?? (rangeStart + rangeEnd) / 2;
+  const originDisplacement = options.originDisplacement ?? 0;
+  const stripLength = rangeEnd - rangeStart;
+  if (!(stripLength > 0)) throw new RangeError("Beam strip must have positive length");
+  const subdivisions = Math.max(8, Math.ceil(68 * stripLength / length));
+  const geometry = new THREE.BoxGeometry(stripLength, h, width, subdivisions, 8, 2);
   const positions = geometry.attributes.position;
   const colors = new Float32Array(positions.count * 3);
-  const deformationScale = config.deformationScale;
   const yieldStrength = mechanics.material.yieldStrength;
-  const calculatedPlasticity = Number.isFinite(solution.maxPlasticStrain);
-  // Smoothly compress deformation only for drawing extreme plastic hinges.
-  // The force/displacement chart always uses uncompressed numerical results.
-  const displayDeflection = value => 2.1 * Math.tanh(value / 2.1);
+  const visualOptions = { beamY: BEAM_Y, plasticVisual: damage?.plasticVisual || 0 };
   for (let i = 0; i < positions.count; i += 1) {
-    const x = clamp(positions.getX(i) + length / 2, 0, length);
+    const x = clamp(positions.getX(i) + (rangeStart + rangeEnd) / 2, 0, length);
     const localY = positions.getY(i) + centerY;
-    const physicalBend = solution.displacementAt(x) * deformationScale;
-    const visualExtra = calculatedPlasticity ? 0 : (damage?.plasticVisual || 0) * 0.12 * Math.pow(x / config.length, 1.4);
-    const currentDeflection = displayDeflection(physicalBend - visualExtra);
-    const rotationAt = solution.rotationAt || mechanics.rotationAt;
-    const currentRotation = clamp(
-      rotationAt(x) * deformationScale -
-      (calculatedPlasticity ? 0 : (damage?.plasticVisual || 0) * 0.11 * Math.pow(x / config.length, 0.6)),
-      -1.3, 0.5);
-    const translatedX = positions.getX(i) - Math.sin(currentRotation) * localY;
-    const translatedY = centerY + positions.getY(i) * Math.cos(currentRotation) + currentDeflection;
-    positions.setXYZ(i, translatedX, translatedY, positions.getZ(i));
+    const point = fragmentVisualPoint(config, solution, x, localY, originX, originDisplacement, visualOptions);
+    positions.setXYZ(i, point.x, point.y, positions.getZ(i));
     const stress = Math.abs(solution.stressAt ? solution.stressAt(x, localY) : mechanics.stressAt(x, localY));
     const color = stressColor(stress / yieldStrength);
     colors[i * 3] = color.r;
@@ -128,6 +123,7 @@ function createDeformedStrip(length, h, width, centerY, config, mechanics, solut
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   positions.needsUpdate = true;
   geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -225,6 +221,10 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let brokenFallbackTime = 0;
   let fractureStarted = false;
   let lastCrackStep = -1;
+  let brokenLocalLowestY = 0;
+  let brokenStartY = 0;
+  let lastDisplayLowestY = BEAM_Y;
+  let ruptureInitialLowestY = null;
 
   let rapier = null;
   let world = null;
@@ -247,7 +247,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     rapier = RAPIER;
     world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     world.timestep = 1 / 60;
-    world.createCollider(RAPIER.ColliderDesc.cuboid(2.575, 0.13, 1.075).setTranslation(0, 0.08, 0));
+    // The visible machine top is y=0.28 m. Match the collision plane to it.
+    world.createCollider(RAPIER.ColliderDesc.cuboid(2.575, 0.20, 1.075).setTranslation(0, 0.08, 0));
     onLoadStatus("Rapier rigid-body simulation ready");
   } catch (error) {
     console.error("Rapier could not initialize:", error);
@@ -288,6 +289,10 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     brokenVisual = null;
     fractureStarted = false;
     brokenFallbackTime = 0;
+    brokenLocalLowestY = 0;
+    brokenStartY = 0;
+    lastDisplayLowestY = BEAM_Y;
+    ruptureInitialLowestY = null;
     lastCrackStep = -1;
     removeDynamicMeshes(damageDebris);
     removeDynamicMeshes(crackGroup);
@@ -305,44 +310,49 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     crackGroup.add(tube);
   }
 
-  function updateCrack(config, damage) {
+  function updateCrack(config, solution, damage) {
     const crackStep = Math.floor((damage.crackProgress + damage.tearProgress) * 18);
-    if (lastCrackStep === crackStep) return;
+    if (crackStep === 0 && lastCrackStep === 0) return;
     lastCrackStep = crackStep;
+    // Crack geometry follows the current bent centerline every load step.
+    // Previously, crack strokes stayed straight in clamp coordinates.
     removeDynamicMeshes(crackGroup);
     if (damage.crackProgress <= 0 && damage.tearProgress <= 0) return;
-    const cutX = 0.23;
-    const yTop = config.depth / 2 + 0.004;
+    const cutX = Math.min(0.23, config.length * 0.22);
+    const topY = config.depth / 2 + 0.004;
     const depthZ = config.width / 2;
     const extend = 0.10 + damage.crackProgress * 0.90;
+    const options = { beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0 };
+    const warp = (x, y, z) => {
+      const point = beamVisualPoint(config, solution, x, y, options);
+      return new THREE.Vector3(point.x, point.y, z);
+    };
     const jagged = [];
-    for (let i = 0; i <= 12; i += 1) {
-      const t = i / 12;
+    for (let i = 0; i <= 18; i++) {
+      const t = i / 18;
       if (t > extend) break;
       const z = -depthZ + config.width * t;
-      const jitter = 0.007 * Math.sin(i * 2.74 + 0.3) * Math.sin(t * Math.PI);
-      jagged.push(new THREE.Vector3(cutX + jitter, yTop, z));
+      const jitter = 0.006 * Math.sin(i * 2.74 + 0.3) * Math.sin(t * Math.PI);
+      jagged.push(warp(cutX + jitter, topY, z));
     }
     if (jagged.length >= 2) {
-      addJaggedCrack(jagged, MATERIALS.crackDark, 0.009);
-      addJaggedCrack(jagged.map(p => new THREE.Vector3(p.x + 0.002, p.y + 0.003, p.z)), MATERIALS.crackEdge, 0.0028);
+      addJaggedCrack(jagged, MATERIALS.crackDark, 0.0075);
+      addJaggedCrack(jagged.map(point => new THREE.Vector3(point.x + 0.001, point.y + 0.002, point.z)), MATERIALS.crackEdge, 0.002);
     }
-    // Tear descends from the tension flange through the web; this is a visual,
-    // art-directed crack front, NOT an evaluated fracture-path solution.
     if (damage.tearProgress > 0) {
       const webPoints = [];
-      const tearDepth = damage.tearProgress * 0.97;
-      for (let i = 0; i <= 15; i += 1) {
-        const t = i / 15;
+      const tearDepth = damage.tearProgress * 0.98;
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24;
         if (t > tearDepth) break;
-        webPoints.push(new THREE.Vector3(
-          cutX + Math.sin(t * 12.4) * 0.006,
+        webPoints.push(warp(
+          cutX + Math.sin(t * 12.4) * 0.0045,
           config.depth / 2 - config.flangeThickness - t * (config.depth - config.flangeThickness),
           config.webThickness / 2 + 0.005
         ));
       }
-      addJaggedCrack(webPoints, MATERIALS.crackDark, 0.010);
-      addJaggedCrack(webPoints.map(p => new THREE.Vector3(p.x + 0.003, p.y, p.z + 0.002)), MATERIALS.crackEdge, 0.003);
+      addJaggedCrack(webPoints, MATERIALS.crackDark, 0.0085);
+      addJaggedCrack(webPoints.map(point => new THREE.Vector3(point.x + 0.001, point.y, point.z + 0.002)), MATERIALS.crackEdge, 0.0025);
     }
   }
 
@@ -391,71 +401,107 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     }
   }
 
-  function makeFragmentStrip(group, length, h, width, centerY, x, material, cutSide) {
-    box(group, length, h, width, x, centerY, 0, material);
-    const cutThickness = Math.min(0.008, length * 0.15);
-    const cutX = x + (cutSide === "right" ? length / 2 : -length / 2);
-    box(group, cutThickness, h, width,
-      cutX + (cutSide === "right" ? cutThickness / 2 : -cutThickness / 2),
-      centerY, 0, MATERIALS.fracture);
-    jaggedRuptureSurface(group, cutX, centerY, h, width, cutSide);
-  }
-
-  function releaseFracture(config) {
-    if (fractureStarted) return false;
-    fractureStarted = true;
-    beamGroup.visible = false;
-    removeDynamicMeshes(crackGroup);
-    const rootLength = Math.min(0.23, config.length * 0.22);
-    const span = Math.max(0.18, config.length - rootLength);
+  function addCurvedFragment(group, config, mechanics, solution, damage, startX, endX, originX, originDisplacement, side) {
     const material = config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam;
     const members = [
       { h: config.flangeThickness, w: config.width, cy: config.depth / 2 - config.flangeThickness / 2 },
       { h: config.depth - 2 * config.flangeThickness, w: config.webThickness, cy: 0 },
       { h: config.flangeThickness, w: config.width, cy: -config.depth / 2 + config.flangeThickness / 2 }
     ];
-    // Leave a visibly torn-off root in the vise.
+    const bounds = new THREE.Box3().makeEmpty();
+    for (const member of members) {
+      const geometry = createDeformedStrip(
+        config.length, member.h, member.w, member.cy,
+        config, mechanics, solution, damage,
+        { rangeStart: startX, rangeEnd: endX, originX, originDisplacement }
+      );
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+      bounds.union(geometry.boundingBox);
+    }
+    // Rotate the jagged exposed cross-section into the very same tangent
+    // as the previously continuous beam. No straight replacement geometry.
+    const cutX = side === "right" ? endX : startX;
+    const pose = beamVisualPose(config, solution, cutX, {
+      beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0
+    });
+    const face = new THREE.Group();
+    face.position.set(cutX - originX, pose.displacement - originDisplacement, 0);
+    face.rotation.z = pose.rotation;
+    group.add(face);
+    for (const member of members) {
+      const offset = side === "right" ? 0.004 : -0.004;
+      box(face, 0.008, member.h, member.w, offset, member.cy, 0, MATERIALS.fracture);
+      jaggedRuptureSurface(face, 0, member.cy, member.h, member.w, side === "right" ? "right" : "left");
+    }
+    return bounds;
+  }
+
+  function releaseFracture(config, mechanics, solution, damage) {
+    if (fractureStarted) return false;
+    fractureStarted = true;
+    const rootLength = Math.min(0.23, config.length * 0.22);
+    const span = config.length - rootLength;
+    const freeCenter = (rootLength + config.length) / 2;
+    const freeCenterBend = beamVisualPose(config, solution, freeCenter, {
+      beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0
+    }).displacement;
+
     const root = new THREE.Group();
     root.position.set(BASE_X, BEAM_Y, 0);
     damageDebris.add(root);
-    for (const m of members) {
-      makeFragmentStrip(root, rootLength, m.h, m.w, m.cy, rootLength / 2, material, "right");
-    }
+    addCurvedFragment(root, config, mechanics, solution, damage,
+      0, rootLength, 0, 0, "right");
+
     brokenVisual = new THREE.Group();
+    brokenStartY = BEAM_Y + freeCenterBend;
+    brokenVisual.position.set(BASE_X + freeCenter, brokenStartY, 0);
     damageDebris.add(brokenVisual);
-    for (const m of members) {
-      makeFragmentStrip(brokenVisual, span, m.h, m.w, m.cy, 0, material, "left");
-    }
-    const spawnX = BASE_X + rootLength + span / 2 + 0.14;
-    const spawnY = BEAM_Y - 0.15;
-    const releaseAngle = -0.21;
-    const releaseRotation = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(0, 0, 1), releaseAngle
+    const bounds = addCurvedFragment(
+      brokenVisual, config, mechanics, solution, damage,
+      rootLength, config.length, freeCenter, freeCenterBend, "left"
     );
-    brokenVisual.position.set(spawnX, spawnY, 0);
-    brokenVisual.quaternion.copy(releaseRotation);
+    brokenLocalLowestY = bounds.min.y;
+    ruptureInitialLowestY = brokenStartY + bounds.min.y;
+    // Both pieces are drawn using the precise display pose field of the
+    // intact beam at rupture. Hide the original only AFTER both exist.
+    beamGroup.visible = false;
+    removeDynamicMeshes(crackGroup);
+
     if (world && rapier) {
+      const center = new THREE.Vector3();
+      const size = new THREE.Vector3();
+      bounds.getCenter(center);
+      bounds.getSize(size);
       brokenBody = world.createRigidBody(
         rapier.RigidBodyDesc.dynamic()
-          .setTranslation(spawnX, spawnY, 0)
-          .setRotation({
-            x: releaseRotation.x, y: releaseRotation.y,
-            z: releaseRotation.z, w: releaseRotation.w
-          })
-          .setLinvel(0.35, -0.38, 0.13)
-          .setAngvel(0.18, 0, -1.5)
-          .setLinearDamping(0.15)
-          .setAngularDamping(0.22)
+          .setTranslation(brokenVisual.position.x, brokenVisual.position.y, 0)
+          .setLinvel(0.08, -0.06, 0)
+          .setAngvel(0, 0, -0.14)
+          .setLinearDamping(0.30)
+          .setAngularDamping(0.62)
           .setCcdEnabled(true)
       );
+      // Conservative collider encloses the curved specimen. The real
+      // platform top and Rapier collision top now agree at y=0.28 m.
+      // Collision of this rigid fragment is illustrative, not a nonlinear
+      // flexible-body or crack-propagation simulation.
       world.createCollider(
-        rapier.ColliderDesc.cuboid(span / 2, config.depth / 2, config.width / 2)
-          .setDensity(0.35)
-          .setRestitution(0.07)
-          .setFriction(0.78),
+        rapier.ColliderDesc.cuboid(
+          Math.max(0.06, size.x / 2 + 0.012),
+          Math.max(0.04, size.y / 2 + 0.012),
+          Math.max(0.025, size.z / 2 + 0.006)
+        )
+          .setTranslation(center.x, center.y, center.z)
+          .setDensity(0.4)
+          .setRestitution(0.035)
+          .setFriction(0.88),
         brokenBody
       );
-      brokenBody.applyImpulse({ x: 0.12, y: -0.12, z: 0.04 }, true);
+      // Avoid an artificial fracture impulse. Gravity and the small
+      // initial actuator motion separate and settle the actual bent shape.
     } else {
       brokenFallbackTime = 0.001;
     }
@@ -464,15 +510,21 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
 
   function updateBeam(config, mechanics, solution, showHeatmap, damage = null) {
     lastConfig = { ...config };
-    const extra = Number.isFinite(solution.maxPlasticStrain) ? 0 : (damage?.plasticVisual || 0) * 0.12;
-    lastTipDeflection = 2.1 * Math.tanh((solution.tipDeflectionM * config.deformationScale - extra) / 2.1);
+    const visual = { beamY: BEAM_Y, plasticVisual: damage?.plasticVisual || 0 };
+    const tipPose = beamVisualPose(config, solution, config.length, visual);
+    lastTipDeflection = tipPose.displacement;
+    lastDisplayLowestY = Infinity;
+    for (let i = 0; i <= 32; i++) {
+      const pose = beamVisualPose(config, solution, config.length * i / 32, visual);
+      lastDisplayLowestY = Math.min(lastDisplayLowestY, pose.bottomSurfaceY);
+    }
     if (damage?.isSeparated) {
-      releaseFracture(config);
+      releaseFracture(config, mechanics, solution, damage);
       return { overstress: true, separated: true };
     }
     if (fractureStarted) return { overstress: true, separated: true };
     beamGroup.visible = true;
-    updateCrack(config, damage || { crackProgress: 0, tearProgress: 0 });
+    updateCrack(config, solution, damage || { crackProgress: 0, tearProgress: 0 });
     const oldMeshes = [...stripMeshes];
     for (const mesh of oldMeshes) {
       beamGroup.remove(mesh);
@@ -486,7 +538,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     ];
     for (const strip of strips) {
       const geometry = createDeformedStrip(
-        config.length, strip.h, strip.w, strip.y, config, mechanics, solution, damage
+        config.length, strip.h, strip.w, strip.y, config, mechanics, solution, damage,
+        { rangeStart: 0, rangeEnd: config.length, originX: config.length / 2, originDisplacement: 0 }
       );
       const mesh = new THREE.Mesh(geometry, showHeatmap ? MATERIALS.heat : config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam);
       mesh.position.x = config.length / 2;
@@ -629,8 +682,12 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     if (brokenFallbackTime > 0 && brokenVisual) {
       brokenFallbackTime += dt;
       const t = brokenFallbackTime;
-      brokenVisual.position.y = Math.max(0.40, BEAM_Y - 0.09 - 2.8 * t * t);
-      brokenVisual.rotation.z = Math.max(-1.5, releaseFallbackAngle(t));
+      const freeFallY = brokenStartY - 0.5 * 9.81 * t * t;
+      brokenVisual.position.y = Math.max(
+        DISPLAY_FLOOR_TOP + 0.015 - brokenLocalLowestY, freeFallY
+      );
+      // The no-Rapier fallback does not rotate into the plate.
+      brokenVisual.rotation.z = 0;
     }
     resize();
     orbit.update();
@@ -638,8 +695,23 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   }
   animationId = requestAnimationFrame(frame);
 
+  function getVisualDiagnostics() {
+    return {
+      floorTop: DISPLAY_FLOOR_TOP,
+      lowestDisplayedSurface: lastDisplayLowestY,
+      ruptureInitialLowestY,
+      separated: fractureStarted,
+      movingPieceY: brokenVisual?.position.y ?? null,
+      movingPieceLowerEstimate: brokenVisual
+        ? brokenVisual.position.y + brokenLocalLowestY : null,
+      intactBeamVisible: beamGroup.visible,
+      stationaryAndMovingPieces: damageDebris.children.length
+    };
+  }
+
   return {
     updateBeam,
+    getVisualDiagnostics,
     resetDamage,
     releaseFracture,
     dropWeight,

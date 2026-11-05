@@ -49,10 +49,10 @@ export function damageState(config, forceKN) {
     (ratio - envelope.tearRatio) / (envelope.fractureRatio - envelope.tearRatio)
   );
   let stage = "elastic";
-  if (ratio >= envelope.fractureRatio) stage = "ruptured";
-  else if (ratio >= envelope.tearRatio) stage = "tearing";
-  else if (ratio >= envelope.crackRatio) stage = "cracking";
-  else if (ratio >= 1) stage = "yielding";
+  if (forceKN >= envelope.ruptureLoadKN * (1 - 1e-10)) stage = "ruptured";
+  else if (forceKN >= envelope.tearLoadKN) stage = "tearing";
+  else if (forceKN >= envelope.crackLoadKN) stage = "cracking";
+  else if (forceKN >= envelope.yieldLoadKN) stage = "yielding";
   return {
     ...envelope,
     ratio,
@@ -81,4 +81,47 @@ export function failureMilestones(config) {
     { stage: "tearing", loadKN: env.tearLoadKN },
     { stage: "ruptured", loadKN: env.ruptureLoadKN }
   ];
+}
+
+
+/**
+ * Compute the last intact-beam load for drawing the piece at rupture.
+ * The actuator can continue commanding a higher force afterward; that extra
+ * command is NOT applied to the separated specimen or its plastic history.
+ */
+export function preRuptureGeometryLoadKN(config, commandedKN) {
+  if (!Number.isFinite(commandedKN) || commandedKN < 0) {
+    throw new RangeError("Invalid commanded load");
+  }
+  return Math.min(commandedKN, failureEnvelope(config).ruptureLoadKN);
+}
+
+/**
+ * Art-directed actuator pacing for a clearly readable damage sequence.
+ * The input and output are commanded loads; the material solver is unchanged.
+ */
+export function stagedActuatorLoad(config, targetKN, progress) {
+  if (!Number.isFinite(targetKN) || targetKN < 0 || !Number.isFinite(progress)) {
+    throw new RangeError("Invalid target or progress");
+  }
+  const p = range01(progress);
+  const easing = v => v * v * (3 - 2 * v);
+  const env = failureEnvelope(config);
+  if (targetKN < env.ruptureLoadKN) return targetKN * easing(p);
+  const stops = [
+    { t: 0, force: 0 },
+    { t: 0.42, force: env.yieldLoadKN },
+    { t: 0.63, force: env.crackLoadKN },
+    { t: 0.80, force: env.tearLoadKN },
+    { t: 0.95, force: env.ruptureLoadKN },
+    { t: 1, force: targetKN }
+  ];
+  for (let i = 1; i < stops.length; i++) {
+    const next = stops[i], prev = stops[i - 1];
+    if (p <= next.t || i === stops.length - 1) {
+      const local = easing(range01((p - prev.t) / (next.t - prev.t)));
+      return prev.force + (next.force - prev.force) * local;
+    }
+  }
+  return targetKN;
 }
