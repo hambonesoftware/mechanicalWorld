@@ -20,6 +20,7 @@ const MATERIALS = {
   beam: metal(0x9caebc, 0.37),
   aluminum: metal(0xc4cdd4, 0.25, 0.78),
   fracture: new THREE.MeshStandardMaterial({ color: 0x572c28, metalness: 0.42, roughness: 0.86 }),
+  tornEdge: new THREE.MeshStandardMaterial({ color: 0xb78073, metalness: 0.65, roughness: 0.65, side: THREE.DoubleSide }),
   crackDark: new THREE.MeshBasicMaterial({ color: 0x120e11, depthTest: false }),
   crackEdge: new THREE.MeshBasicMaterial({ color: 0xffa14c, depthTest: false }),
   heat: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.38, roughness: 0.47, side: THREE.DoubleSide }),
@@ -336,10 +337,59 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     }
   }
 
-  function makeFragmentStrip(group, length, h, width, centerY, x, material) {
+  function jaggedRuptureSurface(parent, x, cy, h, w, side) {
+    const dir = side === "left" ? -1 : 1;
+    const vertices = [];
+    const teeth = 6;
+    // Procedural metal tongues on the flange surface and web edge.
+    // Geometry is a visual tear, not a fracture-mechanics crack path.
+    for (let k = 0; k < teeth; k += 1) {
+      const z0 = -w / 2 + k * w / teeth;
+      const z1 = -w / 2 + (k + 1) * w / teeth;
+      const zmid = (z0 + z1) * 0.5;
+      const length = 0.018 + 0.024 * Math.abs(Math.sin((k + 1) * 2.21 + h * 51));
+      for (const y of [cy - h / 2, cy + h / 2]) {
+        vertices.push(
+          x, y, z0,
+          x, y, z1,
+          x + dir * length, y + (k % 2 === 0 ? 0.004 : -0.004), zmid
+        );
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    const jagged = new THREE.Mesh(geometry, MATERIALS.tornEdge);
+    jagged.castShadow = true;
+    jagged.renderOrder = 12;
+    parent.add(jagged);
+    if (h > w * 2) {
+      // Thin web: a handful of metal tabs tear vertically along the front face.
+      const webVerts = [];
+      for (let k = 0; k < 5; k += 1) {
+        const y0 = cy - h / 2 + k * h / 5;
+        const y1 = cy - h / 2 + (k + 1) * h / 5;
+        webVerts.push(
+          x, y0, w / 2 + 0.002,
+          x, y1, w / 2 + 0.002,
+          x + dir * (0.018 + 0.013 * (k % 3)), (y0 + y1) / 2, w / 2 + 0.002
+        );
+      }
+      const geometry2 = new THREE.BufferGeometry();
+      geometry2.setAttribute("position", new THREE.Float32BufferAttribute(webVerts, 3));
+      geometry2.computeVertexNormals();
+      parent.add(new THREE.Mesh(geometry2, MATERIALS.tornEdge));
+    }
+  }
+
+  function makeFragmentStrip(group, length, h, width, centerY, x, material, cutSide) {
     box(group, length, h, width, x, centerY, 0, material);
     const cutThickness = Math.min(0.008, length * 0.15);
-    box(group, cutThickness, h, width, x - length / 2 - cutThickness / 2, centerY, 0, MATERIALS.fracture);
+    const cutX = x + (cutSide === "right" ? length / 2 : -length / 2);
+    box(group, cutThickness, h, width,
+      cutX + (cutSide === "right" ? cutThickness / 2 : -cutThickness / 2),
+      centerY, 0, MATERIALS.fracture);
+    jaggedRuptureSurface(group, cutX, centerY, h, width, cutSide);
   }
 
   function releaseFracture(config) {
@@ -360,22 +410,31 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     root.position.set(BASE_X, BEAM_Y, 0);
     damageDebris.add(root);
     for (const m of members) {
-      makeFragmentStrip(root, rootLength, m.h, m.w, m.cy, rootLength / 2, material);
+      makeFragmentStrip(root, rootLength, m.h, m.w, m.cy, rootLength / 2, material, "right");
     }
     brokenVisual = new THREE.Group();
     damageDebris.add(brokenVisual);
     for (const m of members) {
-      makeFragmentStrip(brokenVisual, span, m.h, m.w, m.cy, 0, material);
+      makeFragmentStrip(brokenVisual, span, m.h, m.w, m.cy, 0, material, "left");
     }
-    const spawnX = BASE_X + rootLength + span / 2;
-    const spawnY = BEAM_Y - 0.09;
+    const spawnX = BASE_X + rootLength + span / 2 + 0.14;
+    const spawnY = BEAM_Y - 0.15;
+    const releaseAngle = -0.21;
+    const releaseRotation = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 0, 1), releaseAngle
+    );
     brokenVisual.position.set(spawnX, spawnY, 0);
+    brokenVisual.quaternion.copy(releaseRotation);
     if (world && rapier) {
       brokenBody = world.createRigidBody(
         rapier.RigidBodyDesc.dynamic()
           .setTranslation(spawnX, spawnY, 0)
-          .setLinvel(0.25, -0.25, 0.18)
-          .setAngvel(0.2, 0, -1.1)
+          .setRotation({
+            x: releaseRotation.x, y: releaseRotation.y,
+            z: releaseRotation.z, w: releaseRotation.w
+          })
+          .setLinvel(0.35, -0.38, 0.13)
+          .setAngvel(0.18, 0, -1.5)
           .setLinearDamping(0.15)
           .setAngularDamping(0.22)
           .setCcdEnabled(true)
@@ -500,6 +559,10 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     return Math.hypot(pointX - (a.x + dx * t), pointY - (a.y + dy * t)) < 44;
   }
 
+  function releaseFallbackAngle(t) {
+    return -0.21 - Math.min(1.15, 1.4 * t);
+  }
+
   function resize() {
     const bounds = canvas.getBoundingClientRect();
     const width = Math.max(1, Math.round(bounds.width));
@@ -517,12 +580,12 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   }
   function frame(timestamp) {
     animationId = requestAnimationFrame(frame);
-    const dt = Math.min(0.08, Math.max(0, (timestamp - (lastTick || timestamp)) / 1000));
+    const dt = Math.min(0.18, Math.max(0, (timestamp - (lastTick || timestamp)) / 1000));
     lastTick = timestamp;
     frameAccumulator += dt;
     if (world) {
       let steps = 0;
-      while (frameAccumulator >= 1 / 60 && steps < 4) {
+      while (frameAccumulator >= 1 / 60 && steps < 9) {
         world.step();
         frameAccumulator -= 1 / 60;
         steps += 1;
@@ -544,7 +607,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       brokenFallbackTime += dt;
       const t = brokenFallbackTime;
       brokenVisual.position.y = Math.max(0.40, BEAM_Y - 0.09 - 2.8 * t * t);
-      brokenVisual.rotation.z = Math.max(-1.2, -t * 1.3);
+      brokenVisual.rotation.z = Math.max(-1.5, releaseFallbackAngle(t));
     }
     resize();
     orbit.update();

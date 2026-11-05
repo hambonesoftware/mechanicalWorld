@@ -178,3 +178,18 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
 .app-shell[data-damage-stage="tearing"] .status-pill{border-color:#f1aa6c}
 .app-shell[data-damage-stage="ruptured"] .status-pill{border-color:#ff8775}
 @media(max-height:650px){.result-card{max-height:60dvh}}
+
+/* One subtle mechanical jolt on rupture; never a persistent flashing effect. */
+@keyframes specimen-separation {
+  0%{transform:translate(0,0)}
+  15%{transform:translate(1px,-2px)}
+  35%{transform:translate(-2px,2px)}
+  70%{transform:translate(1px,1px)}
+  100%{transform:translate(0,0)}
+}
+.app-shell[data-damage-stage="ruptured"] #laboratory{
+  animation:specimen-separation 250ms ease-out 1;
+}
+@media(prefers-reduced-motion:reduce){
+  .app-shell[data-damage-stage="ruptured"] #laboratory{animation:none}
+}
