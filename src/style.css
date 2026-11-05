@@ -225,7 +225,7 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
 .hb-play--workbench .hb-play__announcement{top:23%;border-radius:5px;font-family:"Space Grotesk",sans-serif;letter-spacing:-.02em}
 .hb-play--workbench .hb-play__control:active{transform:translateY(1px)}
 .settings-menu{position:absolute;z-index:45;right:12px;top:calc(66px + env(safe-area-inset-top,0px))}
-.settings-menu .menu-challenge{width:100%;min-height:44px;font-size:14px;text-align:left;border:0;border-radius:8px}
+.settings-menu .menu-challenge{display:block;width:100%;min-height:44px;padding:10px 12px;font-size:14px;text-align:left;border:0;border-radius:8px;background:transparent;color:#eaf0f2;font-weight:700}
 .tool-sheet{z-index:28;bottom:calc(70px + env(safe-area-inset-bottom,0px));max-height:min(43dvh,390px)}
 #inspectSheet{max-height:min(48dvh,470px)}
 .result-card{z-index:29;bottom:calc(78px + env(safe-area-inset-bottom,0px));background:#1f383de9;max-width:460px}

@@ -76,7 +76,10 @@ test("failure is explained, camera controls and challenge selection remain reach
   await expect(page.locator("#settingsMenu")).toBeVisible();
   await page.locator("#cameraReset").click();
   await expect(page.locator("#settingsMenu")).toBeHidden();
+  await page.locator("#settingsToggle").click();
+  await expect(page.locator("#challengeNext")).toBeVisible();
   await page.locator("#challengeNext").click();
+  await expect(page.locator("#settingsMenu")).toBeHidden();
   await expect(page.locator("#labChip")).toContainText("LAB 02");
 });
 

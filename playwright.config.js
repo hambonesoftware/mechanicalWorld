@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "./tests/browser",
   timeout: 45_000,
   expect: { timeout: 10_000 },
-  workers: 1,
+  workers: 2,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
