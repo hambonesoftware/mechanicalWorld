@@ -23,8 +23,8 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install headless Chromium
+        run: npx playwright install chromium --only-shell
       - name: Check responsive gameplay before publishing
         run: npm run test:e2e
       - name: Archive visual QA screenshots

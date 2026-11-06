@@ -86,3 +86,11 @@ test("post-rupture scene prioritizes visible motion and a compact report", () =>
   assert.match(css,/result-card\.fracture-compact/);
   assert.match(js,/fracture-compact/);
 });
+
+
+test("fracture inspection camera persists after the HUD recomputes its safe frame", () => {
+  const lab = readFileSync(new URL("../src/scene/lab.js",import.meta.url),"utf8");
+  assert.match(lab,/fractureFocusPinned = true/);
+  assert.match(lab,/!fractureFocusPinned\) focusCamera/);
+  assert.match(lab,/fractureGapPixels/);
+});

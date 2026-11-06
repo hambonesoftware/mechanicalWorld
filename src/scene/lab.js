@@ -21,7 +21,7 @@ const MATERIALS = {
   floor: metal(0x213441, 0.95, 0.04),
   beam: metal(0x9caebc, 0.37),
   aluminum: metal(0xc4cdd4, 0.25, 0.78),
-  fracture: new THREE.MeshStandardMaterial({ color: 0x572c28, metalness: 0.42, roughness: 0.86 }),
+  fracture: new THREE.MeshStandardMaterial({ color: 0xa1a8a3, metalness: 0.55, roughness: 0.68, side: THREE.DoubleSide }),
   tornEdge: new THREE.MeshStandardMaterial({ color: 0xb78073, metalness: 0.65, roughness: 0.65, side: THREE.DoubleSide }),
   crackDark: new THREE.MeshBasicMaterial({ color: 0x120e11, depthTest: false }),
   crackEdge: new THREE.MeshBasicMaterial({ color: 0xffa14c, depthTest: false }),
@@ -238,6 +238,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let ruptureRootGroup = null;
   let ruptureDropDistanceM = 0;
   let fractureView = null;
+  let fractureFocusPinned = false;
   let fractureLayersOpened = 0;
   let fractureMaximumOpening = 0;
 
@@ -313,6 +314,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     ruptureRootGroup = null;
     ruptureDropDistanceM = 0;
     fractureView = null;
+    fractureFocusPinned = false;
     fractureLayersOpened = 0;
     fractureMaximumOpening = 0;
     lastCrackStep = -1;
@@ -548,6 +550,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   function focusCamera(config = lastConfig, beamOnly = true, mode = lastSceneMode) {
     if (!config) return;
     fractureView = null;
+    fractureFocusPinned = false;
     lastFullFrame = !beamOnly;
     lastSceneMode = mode;
     const viewport = canvas.getBoundingClientRect();
@@ -596,6 +599,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       centerY + distance * 0.18,
       distance * 0.98
     );
+    fractureFocusPinned = true;
     fractureView = { target, position, started: performance.now() };
   }
 
@@ -609,7 +613,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       Math.abs(rect.centerX - cameraSafeFrame.centerX) > 20 ||
       Math.abs(rect.centerY - cameraSafeFrame.centerY) > 20;
     cameraSafeFrame = rect;
-    if (changed && lastConfig && !fractureView) focusCamera(lastConfig, !lastFullFrame, lastSceneMode);
+    if (changed && lastConfig && !fractureFocusPinned) focusCamera(lastConfig, !lastFullFrame, lastSceneMode);
   }
 
   function worldToScreen(worldPoint) {
@@ -745,6 +749,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       ruptureExposedFaces,
       ruptureDropDistanceM,
       fractureGapPixels,
+      fractureFocusPinned,
       fractureLayersOpened,
       fractureMaximumOpening,
       actualOpenFaces: fractureLayersOpened * 2
