@@ -246,7 +246,7 @@ function createWorkshop(canvas) {
   scene.background = new THREE.Color(0x899b9d);
   scene.fog = new THREE.Fog(0x899b9d, 12, 28);
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 40);
-  const target = new THREE.Vector3(0, 1.85, 0.20);
+  const target = new THREE.Vector3(-0.12, 1.85, 0.20);
   const startOffset = new THREE.Vector3(3.15, 2.10, 8.10);
   const spherical = new THREE.Spherical().setFromVector3(startOffset);
   let panMode = false;
@@ -276,7 +276,7 @@ function createWorkshop(canvas) {
     updateCamera();
   }
   function resetView() {
-    target.set(0, 1.85, 0.20);
+    target.set(-0.12, 1.85, 0.20);
     spherical.setFromVector3(startOffset);
     updateCamera();
   }
@@ -492,11 +492,11 @@ function createWorkshop(canvas) {
   function setFeature(id) {
     if(id==="height"){
       caliper.visible=state.tool==="caliper";
-      caliper.position.set(-0.83,0.94,1.46);
+      caliper.position.set(-0.33,0.94,1.58);
       caliper.rotation.z=0;
     } else if(id==="flange"){
       caliper.visible=state.tool==="caliper";
-      caliper.position.set(-0.82,3.11,1.46);
+      caliper.position.set(-0.45,3.11,1.58);
       caliper.rotation.z=-Math.PI/2;
     } else {
       caliper.visible=false;
@@ -511,8 +511,8 @@ function createWorkshop(canvas) {
     caliper.visible = tool==="caliper";
     micro.visible = tool==="micrometer";
     if(tool==="caliper"){
-      caliper.position.set(state.feature.id==="height"?-0.83:-0.82,
-        state.feature.id==="height"?0.94:3.11,1.46);
+      caliper.position.set(state.feature.id==="height"?-0.33:-0.45,
+        state.feature.id==="height"?0.94:3.11,1.58);
       caliper.rotation.z=state.feature.id==="height"?0:-Math.PI/2;
     }
     renderNeeded=true;

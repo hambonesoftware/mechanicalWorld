@@ -639,3 +639,7 @@ button:disabled{cursor:not-allowed;opacity:.45}
     max-width:none!important;
   }
 }
+
+/* Vector camera control instead of an unsupported font glyph. */
+.career-app .camera-toggle svg{width:23px;height:23px;display:block}
+.career-app .bottom-nav button{padding:0 7px}
