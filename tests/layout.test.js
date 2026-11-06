@@ -94,3 +94,13 @@ test("fracture inspection camera persists after the HUD recomputes its safe fram
   assert.match(lab,/!fractureFocusPinned\) focusCamera/);
   assert.match(lab,/fractureGapPixels/);
 });
+
+
+test("Rapier loose-beam collision follows the curved specimen instead of an enclosing box", () => {
+  const lab = readFileSync(new URL("../src/scene/lab.js",import.meta.url),"utf8");
+  assert.match(lab,/const colliderCount = 4/);
+  assert.match(lab,/setCanSleep\(false\)/);
+  assert.match(lab,/brokenBody\.wakeUp\(\)/);
+  assert.match(lab,/segmentLength \* 0\.52/);
+  assert.match(lab,/brokenBodyVelocityY/);
+});

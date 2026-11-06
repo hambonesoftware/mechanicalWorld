@@ -476,37 +476,51 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     removeDynamicMeshes(crackGroup);
 
     if (world && rapier) {
-      const center = new THREE.Vector3();
-      const size = new THREE.Vector3();
-      bounds.getCenter(center);
-      bounds.getSize(size);
       brokenBody = world.createRigidBody(
         rapier.RigidBodyDesc.dynamic()
           .setTranslation(brokenVisual.position.x, brokenVisual.position.y, 0)
-          .setLinvel(0.08, -0.06, 0)
-          .setAngvel(0, 0, -0.14)
-          .setLinearDamping(0.30)
-          .setAngularDamping(0.62)
+          .setGravityScale(1)
+          .setCanSleep(false)
+          .setLinvel(0.03, -0.035, 0)
+          .setAngvel(0, 0, -0.10)
+          .setLinearDamping(0.16)
+          .setAngularDamping(0.45)
           .setCcdEnabled(true)
       );
-      // Conservative collider encloses the curved specimen. The real
-      // platform top and Rapier collision top now agree at y=0.28 m.
-      // Collision of this rigid fragment is illustrative, not a nonlinear
-      // flexible-body or crack-propagation simulation.
-      world.createCollider(
-        rapier.ColliderDesc.cuboid(
-          Math.max(0.06, size.x / 2 + 0.012),
-          Math.max(0.04, size.y / 2 + 0.012),
-          Math.max(0.025, size.z / 2 + 0.006)
-        )
-          .setTranslation(center.x, center.y, center.z)
-          .setDensity(0.4)
-          .setRestitution(0.035)
-          .setFriction(0.88),
-        brokenBody
-      );
-      // Avoid an artificial fracture impulse. Gravity and the small
-      // initial actuator motion separate and settle the actual bent shape.
+
+      // Do not enclose a *curved* beam in one gigantic box. That box has
+      // empty space under the beam and can establish a spurious supporting
+      // contact with the machine plate, making the fragment appear to hang.
+      // Four short colliders follow the deformed beam centerline instead.
+      const colliderCount = 4;
+      const segmentLength = (config.length - rootLength) / colliderCount;
+      for (let i = 0; i < colliderCount; i++) {
+        const x = rootLength + (i + 0.5) * segmentLength;
+        const pose = beamVisualPose(config, solution, x, {
+          beamY: BEAM_Y, plasticVisual: damage.plasticVisual || 0,
+          rotationAt: mechanics.rotationAt
+        });
+        const angle = pose.rotation;
+        const localX = x - freeCenter;
+        const localY = pose.displacement - freeCenterBend;
+        world.createCollider(
+          rapier.ColliderDesc.cuboid(
+            segmentLength * 0.52,
+            config.depth * 0.48,
+            config.width * 0.52
+          )
+            .setTranslation(localX, localY, 0)
+            .setRotation({
+              x: 0, y: 0,
+              z: Math.sin(angle / 2), w: Math.cos(angle / 2)
+            })
+            .setDensity(0.36)
+            .setRestitution(0.025)
+            .setFriction(0.82),
+          brokenBody
+        );
+      }
+      brokenBody.wakeUp();
     } else {
       brokenFallbackTime = 0.001;
     }
@@ -759,6 +773,10 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       physicsStepCount,
       lastPhysicsState,
       brokenStartY,
+      worldGravityY: world?.gravity?.y ?? null,
+      brokenBodySleeping: brokenBody?.isSleeping?.() ?? null,
+      brokenBodyMass: brokenBody?.mass?.() ?? null,
+      brokenBodyVelocityY: brokenBody?.linvel?.().y ?? null,
       fractureGapPixels,
       fractureFocusPinned,
       fractureLayersOpened,

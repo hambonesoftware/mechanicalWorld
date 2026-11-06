@@ -174,9 +174,17 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
   console.log("REDLINE_RUPTURE_DIAGNOSTICS", JSON.stringify(sceneDebug));
   console.log("REDLINE_RUNTIME_ERRORS", JSON.stringify(runtimeErrors));
   expect(runtimeErrors).toEqual([]);
+  await page.waitForTimeout(2400);
+  const afterRelease = await page.evaluate(() => window.redlineVisualDebug?.());
+  console.log("REDLINE_SETTLED_BODY", JSON.stringify(afterRelease));
+  await page.screenshot({path:"test-results/iphone-portrait-release-motion.png"});
+  expect(runtimeErrors).toEqual([]);
+  expect(afterRelease.physicsStepCount).toBeGreaterThan(sceneDebug.physicsStepCount + 12);
+  expect(afterRelease.brokenBodySleeping).toBe(false);
+  expect(afterRelease.brokenBodyMass).toBeGreaterThan(0);
   await expect.poll(async () => page.evaluate(() =>
     window.redlineVisualDebug?.().ruptureDropDistanceM || 0
-  ), { timeout: 5500 }).toBeGreaterThan(0.24);
+  ), { timeout: 2600 }).toBeGreaterThan(0.24);
   await expect.poll(async () => page.evaluate(() =>
     window.redlineVisualDebug?.().fractureGapPixels || 0
   ), { timeout: 5500 }).toBeGreaterThan(30);

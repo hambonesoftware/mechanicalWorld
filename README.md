@@ -147,3 +147,8 @@ A mobile browser regression test now checks the real distance between opposing r
 ### REDLINE v2.2.2 — visible separation, not only a mathematical gap
 
 The release renderer now tracks **how far the detached fragment actually falls** and how far apart the two opposing fracture faces appear **on screen**, in addition to the numerical gap at rupture. A zoomed, eased-in fracture camera follows the root region when separation begins, and a compact result card leaves the broken specimen visible. Full numerical result text remains available through the Details control. The mobile browser test fails if the detached fragment has not fallen visibly or the final fracture is too small to discern on a phone. Visual QA PNGs are retained as a GitHub Actions artifact for manual review.
+
+
+### Rigid fragment collision refinement
+
+The detached section now uses four short Rapier colliders aligned with its curved centerline rather than one enormous enclosing box. The latter could support the beam at a physically incorrect location on the platform. The moving body has explicit gravity and sleep disabled and is woken immediately after collider construction. The browser test checks world stepping, rigid-body mass, awake state, actual downward motion, and a readable final gap before deployment.
