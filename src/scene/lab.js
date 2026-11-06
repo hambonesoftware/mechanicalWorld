@@ -233,6 +233,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let brokenStartY = 0;
   let lastDisplayLowestY = BEAM_Y;
   let ruptureInitialLowestY = null;
+  let ruptureInitialGapM = null;
+  let ruptureExposedFaces = 0;
   let fractureLayersOpened = 0;
   let fractureMaximumOpening = 0;
 
@@ -303,6 +305,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     brokenStartY = 0;
     lastDisplayLowestY = BEAM_Y;
     ruptureInitialLowestY = null;
+    ruptureInitialGapM = null;
+    ruptureExposedFaces = 0;
     fractureLayersOpened = 0;
     fractureMaximumOpening = 0;
     lastCrackStep = -1;
@@ -323,6 +327,12 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   }
 
   function addSectionMesh(group, config, mechanics, solution, damage, member, start, end, opts = {}) {
+    // Fracture side names also control the slit offset and the dark capped
+    // material. Reject unmatched names rather than silently welding the
+    // visible gap shut at the moment of final rupture.
+    if (opts.side && !["root", "free", "whole"].includes(opts.side)) {
+      throw new RangeError("Unknown fracture fragment side: " + opts.side);
+    }
     const material = opts.heatmap
       ? MATERIALS.heat : config.material === "aluminum" ? MATERIALS.aluminum : MATERIALS.beam;
     const geometry = createDeformedStrip(config.length, member.height, member.width,
@@ -392,6 +402,27 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     return bounds;
   }
 
+  function fractureFaceCentroid(mesh, groupIndex) {
+    const geometry = mesh.geometry;
+    const group = geometry.groups[groupIndex];
+    if (!group) throw new Error("Missing final fracture face");
+    const position = geometry.getAttribute("position");
+    const indices = geometry.getIndex();
+    const center = new THREE.Vector3();
+    const vertex = new THREE.Vector3();
+    const used = new Set();
+    for (let index = group.start; index < group.start + group.count; index++) {
+      const vi = indices ? indices.getX(index) : index;
+      if (used.has(vi)) continue;
+      used.add(vi);
+      vertex.fromBufferAttribute(position, vi);
+      center.add(vertex);
+    }
+    if (used.size === 0) throw new Error("Fracture face has no vertices");
+    center.divideScalar(used.size);
+    return mesh.localToWorld(center);
+  }
+
   function releaseFracture(config, mechanics, solution, damage) {
     if (fractureStarted) return false;
     fractureStarted = true;
@@ -405,7 +436,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     root.position.set(BASE_X, BEAM_Y, 0);
     damageDebris.add(root);
     addCurvedFragment(root, config, mechanics, solution, damage,
-      0, rootLength, 0, 0, "right");
+      0, rootLength, 0, 0, "root");
 
     brokenVisual = new THREE.Group();
     brokenStartY = BEAM_Y + freeCenterBend;
@@ -413,10 +444,19 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     damageDebris.add(brokenVisual);
     const bounds = addCurvedFragment(
       brokenVisual, config, mechanics, solution, damage,
-      rootLength, config.length, freeCenter, freeCenterBend, "left"
+      rootLength, config.length, freeCenter, freeCenterBend, "free"
     );
     brokenLocalLowestY = bounds.min.y;
     ruptureInitialLowestY = brokenStartY + bounds.min.y;
+    // Measure the actual rendered fracture faces, not the theoretical gap
+    // parameter. This catches regressions where the final renderer ignores
+    // the opening or assigns the wrong material side.
+    root.updateMatrixWorld(true);
+    brokenVisual.updateMatrixWorld(true);
+    const rootFace = fractureFaceCentroid(root.children[0], 0);
+    const freeFace = fractureFaceCentroid(brokenVisual.children[0], 1);
+    ruptureInitialGapM = rootFace.distanceTo(freeFace);
+    ruptureExposedFaces = root.children.length + brokenVisual.children.length;
     // Both pieces are drawn using the precise display pose field of the
     // intact beam at rupture. Hide the original only AFTER both exist.
     beamGroup.visible = false;
@@ -643,6 +683,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
         ? brokenVisual.position.y + brokenLocalLowestY : null,
       intactBeamVisible: beamGroup.visible,
       stationaryAndMovingPieces: damageDebris.children.length,
+      ruptureInitialGapM,
+      ruptureExposedFaces,
       fractureLayersOpened,
       fractureMaximumOpening,
       actualOpenFaces: fractureLayersOpened * 2

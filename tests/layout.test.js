@@ -64,3 +64,14 @@ test("nonlinear unloading UI exposes a labeled and replayable force-displacement
   assert.match(js,/replayPlasticSnapshot/);
   assert.match(js,/cycle === "unload"/);
 });
+
+
+test("final fracture uses the same root/free seam identifiers as progressive tearing",()=>{
+  const scene = readFileSync(new URL("../src/scene/lab.js",import.meta.url),"utf8");
+  assert.match(scene,/0, rootLength, 0, 0, "root"/);
+  assert.match(scene,/rootLength, config\.length, freeCenter, freeCenterBend, "free"/);
+  assert.match(scene,/ruptureInitialGapM = rootFace\.distanceTo\(freeFace\)/);
+  assert.match(scene,/Unknown fracture fragment side/);
+  assert.doesNotMatch(scene,/freeCenter, freeCenterBend, "left"/);
+  assert.doesNotMatch(scene,/0, rootLength, 0, 0, "right"/);
+});

@@ -135,3 +135,10 @@ renderer only. This avoids folding the specimen unnaturally toward the
 machine floor while preserving the computed load, deflection and permanent
 set metrics. Mobile regression tests now require actual disconnected
 fracture faces and a measurable opening *during* tearing.
+
+
+### REDLINE v2.2.1 — fracture handoff repair
+
+A rendering regression was found in iPhone screenshots: the progressive tear opened while the beam was loaded, but the final root and falling fragments used legacy left/right identifiers instead of the fracture renderer's root/free sides. This removed the visible slit and the exposed dark fracture faces immediately at rupture. The final fragment builder now uses the same side conventions and opening formula as the live tearing geometry. Invalid fragment names fail explicitly rather than silently closing the crack.
+
+A mobile browser regression test now checks the real distance between opposing rendered mesh face centroids, and requires all 34 exposed fracture faces at separation. It rejects versions that report rupture but display a visually continuous beam.

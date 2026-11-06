@@ -166,6 +166,12 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
   expect(audit.scene.ruptureInitialLowestY).toBeGreaterThan(0.28);
   expect(audit.scene.stationaryAndMovingPieces).toBe(2);
   expect(audit.scene.intactBeamVisible).toBe(false);
+  // Verify the REAL final rendered geometry, not the loading-stage gap.
+  // Formerly the final pieces silently used left/right instead of root/free,
+  // closing every slit at rupture.
+  expect(audit.scene.ruptureExposedFaces).toBe(34);
+  expect(audit.scene.ruptureInitialGapM).toBeGreaterThan(0.045);
+  expect(audit.scene.ruptureInitialGapM).toBeLessThan(0.095);
   await page.screenshot({ path: "test-results/iphone-portrait-ruptured.png" });
   await page.locator("#editAgain").click();
   await expect(page.locator("#game")).toHaveAttribute("data-damage-stage", "elastic");
