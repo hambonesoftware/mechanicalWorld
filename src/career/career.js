@@ -15,7 +15,8 @@ const state = {
   reading: null,
   captured: new Set(),
   pane: "brief",
-  scene: null
+  scene: null,
+  hasDraggedJaw: false
 };
 
 function updateCareerHeader() {
@@ -41,12 +42,48 @@ function showPane(pane) {
     button.classList.toggle("selected", selected);
     button.setAttribute("aria-pressed", String(selected));
   }
-  if (pane === "bench") state.scene?.resize();
+  if (pane === "bench") {
+    state.scene?.resize();
+    state.scene?.updateGrip();
+  }
 }
 
 function message(text, type = "") {
   byId("measureStatus").textContent = text;
   byId("measureStatus").className = "status " + type;
+}
+
+function updateGuide() {
+  const feature = state.feature;
+  const toolName = feature.tool === "caliper" ? "caliper" : "micrometer";
+  const toolIsCorrect = state.tool === feature.tool;
+  const zero = state.zeroed[state.tool];
+  let step, title, detail;
+  if (!toolIsCorrect) {
+    step = "STEP 1 OF 3";
+    title = "Pick up the " + toolName;
+    detail = "Choose the correct measuring tool for " + feature.label.toLowerCase() + ".";
+  } else if (!zero) {
+    step = "STEP 1 OF 3";
+    title = "Zero the " + toolName;
+    detail = "Close the jaws to 0.00 mm and tap Set zero. The orange DRAG JAW handle is on the tool above.";
+  } else if (state.reading === null) {
+    step = "STEP 2 OF 3";
+    title = "Drag the orange jaw";
+    detail = "Place your finger on DRAG JAW above, slide until the opening is near " + feature.nominal + " mm, then release. You can also fine-adjust below.";
+  } else {
+    step = "STEP 3 OF 3";
+    title = "Record the measurement";
+    detail = "Contact confirmed at " + state.reading.toFixed(2) + " mm. Tap Record reading, then measure the next dimension.";
+  }
+  byId("guideStep").textContent = step;
+  byId("guideTitle").textContent = title;
+  byId("guideDetail").textContent = detail;
+  byId("sceneCorner").textContent = state.reading !== null
+    ? "CONTACT ✓ · Record the measured value below"
+    : !toolIsCorrect ? "Select the correct tool below"
+      : !zero ? "Close jaws and press Set zero"
+        : "Put your finger on DRAG JAW and slide it";
 }
 
 function setOpening(next) {
@@ -55,6 +92,7 @@ function setOpening(next) {
   state.reading = null;
   byId("transferReading").disabled = true;
   syncMeter();
+  updateGuide();
 }
 
 function setFeature(id) {
@@ -75,6 +113,7 @@ function setFeature(id) {
   syncMeter();
   state.scene?.setFeature(id);
   message(feature.instruction);
+  updateGuide();
 }
 
 function setTool(tool) {
@@ -91,8 +130,9 @@ function setTool(tool) {
   byId("meterName").textContent = tool === "caliper" ? "DIGITAL CALIPER" : "OUTSIDE MICROMETER";
   syncMeter();
   state.scene?.setTool(tool);
-  message(state.zeroed[tool] ? "Instrument ready. Position the jaws near the indicated dimension." :
+  message(state.zeroed[tool] ? "Instrument ready. Drag the orange jaw grip to the specified dimension." :
     "Close the jaws to 0.00 mm, then press SET ZERO.");
+  updateGuide();
 }
 
 function syncMeter() {
@@ -108,6 +148,11 @@ function syncMeter() {
   byId("caliperStatus").textContent = state.zeroed.caliper ? "Zero set ✓" : "Not zeroed";
   byId("micrometerStatus").textContent = state.zeroed.micrometer ? "Zero set ✓" : "Not zeroed";
   state.scene?.setOpening(state.opening, state.feature.maxOpening);
+  byId("jawGrip").setAttribute("aria-valuemax", String(state.feature.maxOpening));
+  byId("jawGrip").setAttribute("aria-valuenow", String(state.opening));
+  byId("jawGrip").setAttribute("aria-valuetext", state.opening.toFixed(2) + " millimetres");
+  byId("jawGrip").setAttribute("aria-label", "Drag this " + state.tool + " jaw handle to open or close the jaws");
+  byId("gripSymbol").textContent = state.feature.id === "height" && state.tool === "caliper" ? "↕" : "↔";
 }
 
 function zeroCurrentTool() {
@@ -118,7 +163,8 @@ function zeroCurrentTool() {
   state.zeroed[state.tool] = true;
   state.opening = 0;
   syncMeter();
-  message((state.tool === "caliper" ? "Caliper" : "Micrometer") + " zero verified. Select a feature and position the jaws.", "good");
+  message((state.tool === "caliper" ? "Caliper" : "Micrometer") + " zero verified. Drag the orange jaw handle in the 3D view.", "good");
+  updateGuide();
 }
 
 function seatJaws() {
@@ -140,7 +186,8 @@ function seatJaws() {
   state.reading = feature.actual;
   byId("transferReading").disabled = false;
   syncMeter();
-  message("Contact established. Read the display, then record the measurement.", "good");
+  message("Contact ✓ The jaws are seated. Tap RECORD READING to save the measurement.", "good");
+  updateGuide();
 }
 
 function transferReading() {
@@ -215,20 +262,46 @@ function createWorkshop(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.22;
+  renderer.toneMappingExposure = 1.46;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x203442);
-  scene.fog = new THREE.Fog(0x203442, 9, 22);
-  const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 50);
-  camera.position.set(4.6, 3.25, 7.6);
-  camera.lookAt(0, 1.35, 0);
+  scene.background = new THREE.Color(0x8c9eaa);
+  scene.fog = new THREE.Fog(0x8c9eaa, 13, 27);
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
+  const target = new THREE.Vector3(-0.05, 1.48, 0);
+  const initialOffset = new THREE.Vector3(3.7, 2.2, 6.1);
+  const spherical = new THREE.Spherical().setFromVector3(initialOffset);
+  let panMode = false;
+  function updateCamera() {
+    spherical.radius = THREE.MathUtils.clamp(spherical.radius, 2.8, 13);
+    spherical.phi = THREE.MathUtils.clamp(spherical.phi, 0.42, 1.7);
+    target.x = THREE.MathUtils.clamp(target.x, -2.5, 2.5);
+    target.y = THREE.MathUtils.clamp(target.y, 0.7, 2.8);
+    target.z = THREE.MathUtils.clamp(target.z, -2.3, 2.3);
+    camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(spherical));
+    camera.lookAt(target);
+    camera.updateMatrixWorld();
+  }
+  function panCamera(dx, dy) {
+    const speed = spherical.radius / Math.max(170, canvas.clientHeight) * 0.82;
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    target.addScaledVector(right, -dx * speed);
+    target.addScaledVector(up, dy * speed);
+    updateCamera();
+  }
+  function resetCamera() {
+    target.set(-0.05, 1.48, 0);
+    spherical.setFromVector3(initialOffset);
+    updateCamera();
+  }
+  updateCamera();
 
-  const ambient = new THREE.HemisphereLight(0xe4f1ff, 0x30323a, 2.1);
+  const ambient = new THREE.HemisphereLight(0xffffff, 0x728394, 3.3);
   scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xffe3c2, 3.4);
+  const key = new THREE.DirectionalLight(0xfff7e9, 4.2);
   key.position.set(-3, 8, 4);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -238,16 +311,16 @@ function createWorkshop(canvas) {
   key.shadow.camera.bottom = -7;
   key.shadow.normalBias = 0.035;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x74b7d4, 1.6);
+  const fill = new THREE.DirectionalLight(0xd4eafa, 2.4);
   fill.position.set(5, 3, -4);
   scene.add(fill);
 
-  const steel = new THREE.MeshStandardMaterial({ color: 0x94a5ad, roughness: 0.34, metalness: 0.83 });
-  const blackSteel = new THREE.MeshStandardMaterial({ color: 0x293b49, roughness: 0.48, metalness: 0.62 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xb3c6cf, roughness: 0.44, metalness: 0.45 });
+  const blackSteel = new THREE.MeshStandardMaterial({ color: 0x425967, roughness: 0.53, metalness: 0.38 });
   const darkRubber = new THREE.MeshStandardMaterial({ color: 0x20262b, roughness: 0.86, metalness: 0.02 });
-  const wood = new THREE.MeshStandardMaterial({ color: 0x796f5a, roughness: 0.92 });
-  const yellow = new THREE.MeshStandardMaterial({ color: 0xe9b46d, roughness: 0.38, metalness: 0.4 });
-  const highlighter = new THREE.MeshStandardMaterial({ color: 0xf9d097, roughness: 0.5, emissive: 0x664010, emissiveIntensity: 0.23 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0xb0a18a, roughness: 0.87 });
+  const yellow = new THREE.MeshStandardMaterial({ color: 0xffc56d, roughness: 0.4, metalness: 0.28 });
+  const highlighter = new THREE.MeshStandardMaterial({ color: 0xffd68b, roughness: 0.55, emissive: 0xb37a35, emissiveIntensity: 0.24 });
 
   function box(parent, w, h, d, x, y, z, material, shadow = true) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
@@ -258,7 +331,7 @@ function createWorkshop(canvas) {
     return mesh;
   }
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60),
-    new THREE.MeshStandardMaterial({ color: 0x333a40, roughness: 0.92 }));
+    new THREE.MeshStandardMaterial({ color: 0x879299, roughness: 0.92 }));
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
@@ -270,9 +343,9 @@ function createWorkshop(canvas) {
     box(scene, 0.17, 0.55, 0.17, x, 0.27, z, blackSteel);
   }
   box(scene, 7.5, 4.0, 0.12, 0, 2.25, -3.5,
-    new THREE.MeshStandardMaterial({ color: 0x304553, roughness: 0.94 }), false);
+    new THREE.MeshStandardMaterial({ color: 0xa3b0b7, roughness: 0.94 }), false);
   box(scene, 4.4, 1.7, 0.09, -0.2, 2.28, -3.38,
-    new THREE.MeshStandardMaterial({ color: 0x3c525b, roughness: 0.85 }), false);
+    new THREE.MeshStandardMaterial({ color: 0x778d95, roughness: 0.85 }), false);
   for (let x = -2.15; x <= 1.8; x += 0.25) {
     for (let y = 1.58; y <= 3.0; y += 0.25) {
       const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.011, 6), blackSteel);
@@ -302,14 +375,14 @@ function createWorkshop(canvas) {
 
   // Digital caliper: fixed jaw, movable carriage and long scale.
   const caliper = new THREE.Group();
-  caliper.position.set(0.1, 2.35, 1.15);
+  caliper.position.set(0.15, 2.39, 1.22);
   box(caliper, 3.1, 0.11, 0.13, 0, 0, 0, steel);
   box(caliper, 0.19, 0.54, 0.17, -1.34, -0.25, 0, steel);
   box(caliper, 0.44, 0.39, 0.24, -0.45, 0.09, 0.02, darkRubber);
   const caliperSlide = new THREE.Group();
   box(caliperSlide, 0.21, 0.55, 0.17, 0, -0.24, 0, steel);
-  box(caliperSlide, 0.47, 0.34, 0.24, 0, 0.12, 0, blackSteel);
-  box(caliperSlide, 0.30, 0.19, 0.01, 0, 0.15, 0.123, highlighter, false);
+  box(caliperSlide, 0.50, 0.34, 0.27, 0, 0.12, 0, yellow);
+  box(caliperSlide, 0.33, 0.20, 0.04, 0, 0.15, 0.15, darkRubber, false);
   caliper.add(caliperSlide);
   scene.add(caliper);
 
@@ -324,31 +397,165 @@ function createWorkshop(canvas) {
   const microSlide = box(micro, 0.48, 0.15, 0.17, 0.18, -0.08, 0, steel);
   scene.add(micro);
 
-  // The featured part glows subtly; this is selection feedback, not stress analysis.
+  // Pointer gestures: one finger rotates (or pans in PAN mode), two fingers
+  // pinch to zoom and translate the target, mouse wheel zooms, Shift-drag pans.
+  // Taps still raycast to select a feature. The jaw handle uses a separate
+  // accessible DOM hit area and its own captured pointer stream.
   const targets = [upper, lower, web];
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
-  let lastDown = null;
-  canvas.addEventListener("pointerdown", event => {
-    lastDown = { x: event.clientX, y: event.clientY };
-  });
-  canvas.addEventListener("pointerup", event => {
-    if (!lastDown || Math.hypot(event.clientX - lastDown.x, event.clientY - lastDown.y) > 12) return;
-    lastDown = null;
+  const pointers = new Map();
+  let lastGesture = null;
+  let tapStart = null;
+  function getGesture() {
+    const items = [...pointers.values()];
+    if (items.length < 2) return null;
+    const a = items[0], b = items[1];
+    return {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+      distance: Math.max(8, Math.hypot(a.x - b.x, a.y - b.y))
+    };
+  }
+  function tapFeature(x, y) {
     const rect = canvas.getBoundingClientRect();
-    mouse.set((event.clientX - rect.left) * 2 / rect.width - 1,
-      -(event.clientY - rect.top) * 2 / rect.height + 1);
+    mouse.set((x - rect.left) * 2 / rect.width - 1,
+      -(y - rect.top) * 2 / rect.height + 1);
     raycaster.setFromCamera(mouse, camera);
     const hit = raycaster.intersectObjects(targets, false)[0];
     if (hit?.object?.userData?.feature) setFeature(hit.object.userData.feature);
+  }
+  canvas.addEventListener("pointerdown", event => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic pointer */ }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    tapStart = pointers.size === 1 ? { x: event.clientX, y: event.clientY, id: event.pointerId, moved: false } : null;
+    lastGesture = getGesture();
   });
-  canvas.addEventListener("pointercancel", () => { lastDown = null; });
+  canvas.addEventListener("pointermove", event => {
+    const prev = pointers.get(event.pointerId);
+    if (!prev) return;
+    event.preventDefault();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const gesture = getGesture();
+    if (gesture && lastGesture) {
+      panCamera(gesture.x - lastGesture.x, gesture.y - lastGesture.y);
+      spherical.radius *= lastGesture.distance / gesture.distance;
+      updateCamera();
+    } else if (pointers.size === 1) {
+      const dx = event.clientX - prev.x;
+      const dy = event.clientY - prev.y;
+      if (tapStart && Math.hypot(event.clientX - tapStart.x, event.clientY - tapStart.y) > 8) tapStart.moved = true;
+      if (panMode || event.shiftKey) {
+        panCamera(dx, dy);
+      } else {
+        spherical.theta -= dx * 0.0075;
+        spherical.phi -= dy * 0.0075;
+        updateCamera();
+      }
+    }
+    lastGesture = gesture;
+    updateGrip();
+  });
+  function endPointer(event) {
+    const started = tapStart;
+    if (started && started.id === event.pointerId && !started.moved &&
+        Math.hypot(event.clientX - started.x, event.clientY - started.y) < 8) {
+      tapFeature(event.clientX, event.clientY);
+    }
+    pointers.delete(event.pointerId);
+    lastGesture = getGesture();
+    tapStart = null;
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+  canvas.addEventListener("wheel", event => {
+    event.preventDefault();
+    spherical.radius *= Math.exp(event.deltaY * 0.0012);
+    updateCamera();
+    updateGrip();
+  }, { passive: false });
+
+  const grip = byId("jawGrip");
+  let jawPointer = null;
+  grip.addEventListener("pointerdown", event => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    jawPointer = {
+      id: event.pointerId,
+      x: event.clientX, y: event.clientY, opening: state.opening,
+      moved: false
+    };
+    try { grip.setPointerCapture(event.pointerId); } catch { /* synthetic pointer */ }
+    grip.classList.add("dragging");
+    byId("gestureHint").textContent = "Move the orange jaw to the target opening, then release.";
+  });
+  grip.addEventListener("pointermove", event => {
+    if (!jawPointer || jawPointer.id !== event.pointerId) return;
+    event.preventDefault();
+    const isVertical = state.feature.id === "height" && state.tool === "caliper";
+    const delta = isVertical ? event.clientY - jawPointer.y : event.clientX - jawPointer.x;
+    const maxDistance = Math.max(118, Math.min(235,
+      (isVertical ? canvas.clientHeight : canvas.clientWidth) * 0.62));
+    if (Math.abs(delta) > 3) jawPointer.moved = true;
+    setOpening(jawPointer.opening + delta * state.feature.maxOpening / maxDistance);
+    updateGrip();
+  });
+  function finishJaw(event) {
+    if (!jawPointer || jawPointer.id !== event.pointerId) return;
+    const moved = jawPointer.moved;
+    jawPointer = null;
+    grip.classList.remove("dragging");
+    if (moved) {
+      state.hasDraggedJaw = true;
+      if (canSeat(state.feature, state.tool, state.zeroed[state.tool], state.opening)) {
+        seatJaws();
+      } else if (!state.zeroed[state.tool]) {
+        message("Great, that moves the jaw. Close it back to zero and tap Set zero first.", "warning");
+      } else if (state.tool !== state.feature.tool) {
+        message("Switch to the instrument requested by this drawing.", "warning");
+      } else {
+        message("Keep sliding toward " + state.feature.nominal + " mm, then release near the part.", "warning");
+      }
+      byId("gestureHint").textContent = "One finger: rotate · Two: pan + pinch · PAN: drag view";
+    }
+    updateGrip();
+  }
+  grip.addEventListener("pointerup", finishJaw);
+  grip.addEventListener("pointercancel", finishJaw);
+  grip.addEventListener("keydown", event => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowDown" &&
+        event.key !== "ArrowRight" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const sign = event.key === "ArrowRight" || event.key === "ArrowUp" ? 1 : -1;
+    setOpening(state.opening + sign * (event.shiftKey ? 1 : 0.1));
+    updateGrip();
+  });
+
+  function updateGrip() {
+    if (canvas.clientWidth < 2 || canvas.clientHeight < 2) return;
+    const instrument = state.tool === "caliper" ? caliperSlide : microSlide;
+    instrument.updateWorldMatrix(true, false);
+    const point = new THREE.Vector3(0, 0.2, 0.30);
+    instrument.localToWorld(point);
+    point.project(camera);
+    const width = canvas.clientWidth, height = canvas.clientHeight;
+    const x = THREE.MathUtils.clamp((point.x + 1) * width / 2, 70, width - 70);
+    const y = THREE.MathUtils.clamp((1 - point.y) * height / 2, 67, height - 77);
+    grip.style.left = x + "px";
+    grip.style.top = y + "px";
+    grip.classList.toggle("grip-vertical", state.feature.id === "height" && state.tool === "caliper");
+    grip.hidden = false;
+  }
 
   function setFeatureVisual(featureId) {
     upper.material = featureId === "height" || featureId === "flange" ? highlighter : steel;
     lower.material = featureId === "height" ? highlighter : steel;
     web.material = featureId === "web" || featureId === "height" ? highlighter : steel;
-    caliper.rotation.z = featureId === "height" ? Math.PI / 2 : 0;
+    caliper.rotation.z = featureId === "height" ? -Math.PI / 2 : 0;
+    caliper.position.y = featureId === "height" ? 1.86 : 2.39;
   }
 
   function setOpeningVisual(value, max) {
@@ -367,8 +574,9 @@ function createWorkshop(canvas) {
     if (width < 2 || height < 2) return;
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    camera.position.set(width < 500 ? 4.9 : 4.6, 3.25, width < 500 ? 9.2 : 7.6);
     camera.updateProjectionMatrix();
+    updateCamera();
+    updateGrip();
   }
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
@@ -382,6 +590,7 @@ function createWorkshop(canvas) {
     if (time - lastFrame < 34 || document.hidden || canvas.clientWidth < 2) return;
     lastFrame = time;
     renderer.render(scene, camera);
+    updateGrip();
   }
   requestAnimationFrame(draw);
   window.addEventListener("pagehide", () => {
@@ -390,7 +599,16 @@ function createWorkshop(canvas) {
     renderer.dispose();
   }, { once: true });
 
-  return { resize, setFeature: setFeatureVisual, setTool: setToolVisual, setOpening: setOpeningVisual };
+  return {
+    resize, updateGrip, setFeature: setFeatureVisual, setTool: setToolVisual,
+    setOpening: setOpeningVisual, zoom(factor) { spherical.radius *= factor; updateCamera(); updateGrip(); },
+    resetView() { resetCamera(); updateGrip(); },
+    setPan(enabled) { panMode = enabled; },
+    getDiagnostics() {
+      return { radius: spherical.radius, theta: spherical.theta, phi: spherical.phi,
+        target: target.toArray(), opening: state.opening, panMode };
+    }
+  };
 }
 
 function connect() {
@@ -398,6 +616,18 @@ function connect() {
     button.addEventListener("click", () => showPane(button.dataset.pane));
   }
   byId("goBench").addEventListener("click", () => showPane("bench"));
+  byId("zoomIn").addEventListener("click", () => state.scene?.zoom(0.8));
+  byId("zoomOut").addEventListener("click", () => state.scene?.zoom(1.25));
+  byId("resetView").addEventListener("click", () => state.scene?.resetView());
+  byId("panMode").addEventListener("click", () => {
+    const button = byId("panMode");
+    const enabled = button.getAttribute("aria-pressed") !== "true";
+    button.setAttribute("aria-pressed", String(enabled));
+    state.scene?.setPan(enabled);
+    byId("gestureHint").textContent = enabled
+      ? "PAN MODE · Drag one finger to move the view · Pinch to zoom"
+      : "One finger: rotate · Two: pan + pinch · PAN: drag view";
+  });
   for (const button of query("[data-feature]")) {
     button.addEventListener("click", () => setFeature(button.dataset.feature));
   }
@@ -431,11 +661,15 @@ function main() {
     state.scene = createWorkshop(byId("workbench3d"));
     state.scene.setFeature(state.feature.id);
     state.scene.setTool(state.tool);
+    if (new URLSearchParams(window.location.search).has("debug")) {
+      window.redlineCareerDebug = () => state.scene?.getDiagnostics();
+    }
   } catch (error) {
     console.warn("REDLINE career workshop 3D unavailable", error);
     byId("sceneError").hidden = false;
   }
   syncMeter();
+  updateGuide();
 }
 
 main();

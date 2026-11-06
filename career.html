@@ -43,7 +43,7 @@
         <li><span>06</span><p>Choose ACCEPT or REJECT, then submit your signed report.</p></li>
       </ol>
       <div class="order-footer"><span>REWARD</span><strong>+100 XP</strong><span>·</span><strong>Workstation access</strong></div>
-      <button id="goBench" type="button" class="button button-primary full">Go to workbench <span>→</span></button>
+      <button id="goBench" type="button" class="button button-primary full">Start measuring <span>→</span></button>
       <a href="./" class="quiet-link">Existing beam test lab / Sandbox ↗</a>
     </aside>
 
@@ -52,14 +52,25 @@
         <div><p class="eyebrow">METROLOGY STATION / BENCH 01</p><h2>Inspect the part</h2></div>
         <span class="tag">STOCK 3042-B</span>
       </div>
-      <div class="scene-wrap">
-        <canvas id="workbench3d" aria-label="Three-dimensional industrial workbench with an I-beam and measuring instruments. Select a dimension to measure." tabindex="0"></canvas>
+      <div class="scene-wrap" id="sceneWrap">
+        <canvas id="workbench3d" aria-label="Interactive 3D bench. Drag a finger to orbit, use two fingers to pan and pinch to zoom, or select Pan mode. Tap the part to select a feature." tabindex="0"></canvas>
         <div class="scene-label"><span class="live-dot"></span> LIVE WORKBENCH <span class="separator">/</span> PART 3042-B</div>
-        <div class="scene-corner">DRAG THE INSTRUMENT JAWS BELOW</div>
+        <div class="scene-camera-tools" role="group" aria-label="3D camera controls">
+          <button id="zoomIn" type="button" aria-label="Zoom in on workbench" title="Zoom in">+</button>
+          <button id="zoomOut" type="button" aria-label="Zoom out from workbench" title="Zoom out">−</button>
+          <button id="panMode" type="button" aria-label="Switch between rotate and pan touch gestures" aria-pressed="false" title="Drag to pan">✥ <span>PAN</span></button>
+          <button id="resetView" type="button" aria-label="Reset 3D camera to default view" title="Reset view">⌖</button>
+        </div>
+        <div id="jawGrip" class="jaw-grip" role="slider" aria-label="Drag the orange caliper jaw handle to adjust opening" aria-valuemin="0" aria-valuemax="250" aria-valuenow="0" tabindex="0">
+          <span class="grip-symbol" id="gripSymbol">↕</span><span class="grip-title">DRAG JAW</span>
+        </div>
+        <div class="scene-gesture-hint" id="gestureHint">↻ Rotate with one finger · Pinch to zoom · Two fingers to pan</div>
+        <div class="scene-corner" id="sceneCorner">Touch the orange jaw handle to measure</div>
         <div class="scene-error" id="sceneError" hidden>3D graphics unavailable. The measurement station controls remain usable.</div>
       </div>
-      <div class="measure-controls">
-        <div class="control-heading"><strong>01 <span>Select a feature</span></strong><small>Tap a dimension, or touch the 3D part</small></div>
+      <div class="measure-controls" id="measureControls">
+        <div class="bench-guidance"><span id="guideStep">STEP 1 OF 3</span><strong id="guideTitle">Zero the digital caliper</strong><p id="guideDetail">Close the jaws, then tap Set zero. The orange grip above is your direct touch control.</p></div>
+        <div class="control-heading"><strong>01 <span>Select a feature</span></strong><small>Choose what to measure</small></div>
         <div class="feature-grid" role="group" aria-label="Part features">
           <button class="feature selected" type="button" data-feature="height" aria-pressed="true"><span>OVERALL HEIGHT</span><b>H</b><small>±0.5 mm</small></button>
           <button class="feature" type="button" data-feature="flange" aria-pressed="false"><span>FLANGE WIDTH</span><b>W</b><small>±0.5 mm</small></button>
@@ -73,19 +84,20 @@
         <div class="meter-console">
           <div class="meter-heading"><span id="meterName">DIGITAL CALIPER</span><span id="meterZero">ZERO REQUIRED</span></div>
           <div class="meter-display"><span id="meterReading">--.--</span><small>mm</small><span id="meterState">OPEN JAWS</span></div>
-          <label for="jawOpening">Jaw opening <output id="openingValue">0.00 mm</output></label>
+          <label for="jawOpening">Jaw opening · fine adjustment <output id="openingValue">0.00 mm</output></label>
           <input type="range" id="jawOpening" min="0" max="250" step="0.01" value="0" aria-label="Drag jaws to approximate the measurement">
           <div class="jaw-buttons">
             <button type="button" id="jawMinus" aria-label="Close jaws by 0.1 millimetre">− 0.1</button>
             <button type="button" id="jawPlus" aria-label="Open jaws by 0.1 millimetre">+ 0.1</button>
           </div>
-          <p class="status" id="measureStatus" role="status" aria-live="polite">Close the jaws and zero the caliper before measuring.</p>
-          <div class="console-actions">
-            <button id="zeroTool" class="button button-outline" type="button">Set zero</button>
-            <button id="seatJaws" class="button button-primary" type="button">Seat jaws</button>
-            <button id="transferReading" class="button button-outline" type="button" disabled>Record reading →</button>
-          </div>
+          <p class="status" id="measureStatus" role="status" aria-live="polite">Touch the orange grip on the tool in the 3D view, or use the fine-adjust slider.</p>
+
         </div>
+      </div>
+      <div class="console-actions bench-actionbar" aria-label="Measurement actions">
+        <button id="zeroTool" class="button button-outline" type="button">1 · Set zero</button>
+        <button id="seatJaws" class="button button-outline" type="button">2 · Touch off</button>
+        <button id="transferReading" class="button button-primary" type="button" disabled>3 · Record →</button>
       </div>
     </section>
 
