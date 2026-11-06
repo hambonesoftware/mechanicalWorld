@@ -86,6 +86,8 @@ test("failure is explained, camera controls and challenge selection remain reach
 test("full commanded overload shows cracking, tearing and a detached specimen", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "iphone-portrait", "One complete destructive run validates the shared scene.");
   await waitForLab(page, "/?debug=1");
+  const runtimeErrors = [];
+  page.on("pageerror", error => runtimeErrors.push(error.message));
   await page.evaluate(() => {
     window.redlineFailureAudit = { stages: [], minimumY: Infinity, samples: 0 };
     const game = document.getElementById("game");
@@ -168,6 +170,10 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
   expect(audit.scene.intactBeamVisible).toBe(false);
   // A numeric seam is not enough. The loose beam must actually move away
   // from the clamp and be visibly separated on a phone-sized viewport.
+  const sceneDebug = await page.evaluate(() => window.redlineVisualDebug?.());
+  console.log("REDLINE_RUPTURE_DIAGNOSTICS", JSON.stringify(sceneDebug));
+  console.log("REDLINE_RUNTIME_ERRORS", JSON.stringify(runtimeErrors));
+  expect(runtimeErrors).toEqual([]);
   await expect.poll(async () => page.evaluate(() =>
     window.redlineVisualDebug?.().ruptureDropDistanceM || 0
   ), { timeout: 5500 }).toBeGreaterThan(0.24);

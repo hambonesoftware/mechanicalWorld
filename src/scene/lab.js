@@ -249,6 +249,9 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let animationId = 0;
   let lastTick = 0;
   let frameAccumulator = 0;
+  let physicsStepCount = 0;
+  let visualFrameCount = 0;
+  let lastPhysicsState = "starting";
   let cachedWidth = 0;
   let cachedHeight = 0;
   let lastConfig = null;
@@ -671,13 +674,16 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   }
   function frame(timestamp) {
     animationId = requestAnimationFrame(frame);
+    visualFrameCount++;
     const dt = Math.min(0.18, Math.max(0, (timestamp - (lastTick || timestamp)) / 1000));
     lastTick = timestamp;
     frameAccumulator += dt;
     if (world) {
+      lastPhysicsState = "running";
       let steps = 0;
       while (frameAccumulator >= 1 / 60 && steps < 9) {
         world.step();
+        physicsStepCount++;
         frameAccumulator -= 1 / 60;
         steps += 1;
       }
@@ -696,6 +702,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       }
     }
     if (brokenFallbackTime > 0 && brokenVisual) {
+      lastPhysicsState = "fallback";
       brokenFallbackTime += dt;
       const t = brokenFallbackTime;
       const freeFallY = brokenStartY - 0.5 * 9.81 * t * t;
@@ -748,6 +755,10 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       ruptureInitialGapM,
       ruptureExposedFaces,
       ruptureDropDistanceM,
+      visualFrameCount,
+      physicsStepCount,
+      lastPhysicsState,
+      brokenStartY,
       fractureGapPixels,
       fractureFocusPinned,
       fractureLayersOpened,
