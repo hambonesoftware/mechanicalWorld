@@ -624,3 +624,18 @@ button:disabled{cursor:not-allowed;opacity:.45}
   width:1px!important;height:1px!important;overflow:hidden!important;
   clip-path:inset(50%)!important;padding:0!important;border:0!important;
 }
+
+@media(max-height:540px) and (orientation:landscape){
+  /* Preserve the actionable reference buttons; career identity can be
+     reopened from the work order outside the compact landscape viewport. */
+  .career-app .career-identity{display:none!important}
+  .career-app #openWorkOrder{
+    top:calc(93px + var(--safe-t))!important;
+    right:8px!important;
+  }
+  .career-app .bottom-nav{
+    top:5px!important;
+    right:8px!important;
+    max-width:none!important;
+  }
+}
