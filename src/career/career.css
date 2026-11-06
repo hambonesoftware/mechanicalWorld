@@ -214,3 +214,55 @@ input[type=range]{width:100%;accent-color:var(--amber);margin:14px 0 6px;min-hei
   .scene-gesture-hint{font-size:8px}
   .scene-corner{font-size:8px;bottom:33px}
 }
+
+
+/* More room for the actual object: controls live in a scrollable instrument tray,
+   not as an endless page pushing the 3D object off the phone. */
+@media(max-width:800px) and (min-height:501px){
+  .scene-wrap{min-height:205px}
+  .measure-controls{max-height:clamp(166px,26dvh,238px);min-height:154px}
+}
+/* Phones held sideways commonly report 812–932 CSS pixels in width.
+   Use a two-pane playable game, rather than cramped desktop 3-column layout. */
+@media(min-width:801px) and (max-width:1024px) and (max-height:500px) and (orientation:landscape){
+  .career-app{height:100dvh;overflow:hidden}
+  .app-header{min-height:40px;padding:5px 12px}
+  .app-header .mark-text small,.app-header .employee-chip small,.header-center{display:none}
+  .mobile-nav{display:grid;grid-template-columns:repeat(3,1fr);order:2;flex:0 0 auto;background:#1d2c37;border-top:1px solid #526976}
+  .mobile-nav button{min-height:35px;border:0;border-top:3px solid transparent;background:transparent;color:#b4c5ce;font-size:9px;letter-spacing:.4px}
+  .mobile-nav button b{display:inline;font-size:10px}
+  .mobile-nav button.selected{color:#ffc47b;border-top-color:#ffc47b;background:#263a46}
+  .work-layout{display:block;flex:1;min-height:0;overflow:hidden;height:auto}
+  .panel{display:none;height:100%;overflow:auto}
+  .panel.mobile-active{display:block}
+  .bench-panel.mobile-active{position:relative;display:flex;flex-direction:column;overflow:hidden}
+  .bench-header{flex:none;min-height:34px;padding:5px 13px}
+  .bench-header .eyebrow{display:none}
+  .bench-header h2{font-size:16px}
+  .scene-wrap{position:absolute;left:0;top:34px;bottom:56px;width:54%;height:auto;min-height:0}
+  .scene-label{font-size:8px;top:8px;left:8px;padding:5px 7px}
+  .scene-gesture-hint{font-size:8px;bottom:4px}
+  .scene-corner{font-size:8px;bottom:32px}
+  .scene-camera-tools{top:8px;right:7px}
+  .scene-camera-tools button{min-width:34px;min-height:34px;font-size:18px}
+  .jaw-grip{width:74px;min-height:47px}
+  .grip-title{font-size:9px}
+  .measure-controls{margin-left:54%;width:46%;flex:1 1 auto;overflow:auto;max-height:none;min-height:0;padding:8px 11px 64px}
+  .bench-guidance{position:sticky;top:-8px;z-index:6;padding:7px 9px}
+  .bench-guidance p{font-size:10px}
+  .feature{padding:7px 6px;min-height:45px}
+  .tool{min-height:43px;padding:7px}
+  .bench-actionbar{position:absolute;bottom:0;left:0;right:0;height:56px;padding:5px 9px;background:#152b38}
+  .bench-actionbar .button{min-height:43px;font-size:11px}
+}
+
+/* The first actionable button belongs above the lengthy training procedure. */
+.start-cta{margin:3px 0 5px;font-size:13px;min-height:49px}
+.start-hint{margin:2px 0 17px;color:#c5d4d9;font-size:11px;line-height:1.42}
+@media(max-width:800px){.start-cta{min-height:54px;font-size:14px}}
+
+/* Clear the camera toolbar on small scenes; status hints never sit under a button. */
+@media(max-width:1024px){
+  .scene-gesture-hint{right:63px}
+  .scene-corner{right:63px}
+}

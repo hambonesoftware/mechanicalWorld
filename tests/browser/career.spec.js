@@ -164,3 +164,29 @@ test("workbench remains usable without scrolling past the action bar on narrow p
   expect(grip.y + grip.height).toBeLessThanOrEqual(scene.y + scene.height + 2);
   expect(viewport.width).toBeLessThanOrEqual(400);
 });
+
+
+test("the work order has a visible start action on portrait phones", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.includes("portrait"), "Phone onboarding check.");
+  await page.goto("/career.html");
+  await expect(page.locator("#goBench")).toBeVisible();
+  await expect(page.locator("#goBench")).toBeInViewport();
+  await page.locator("#goBench").click();
+  await expect(page.locator("#jawGrip")).toBeVisible();
+});
+
+test("landscape phone uses a two-pane workstation, not three cramped desktop columns", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-landscape", "Wide landscape-phone layout check.");
+  await page.goto("/career.html");
+  await expect(page.locator(".mobile-nav")).toBeVisible();
+  await expect(page.locator(".report-panel")).toBeHidden();
+  await page.locator("#goBench").click();
+  await expect(page.locator("#sceneWrap")).toBeVisible();
+  await expect(page.locator("#zoomIn")).toBeVisible();
+  const viewport = page.viewportSize();
+  const scene = await page.locator("#sceneWrap").boundingBox();
+  const buttons = await page.locator(".bench-actionbar").boundingBox();
+  expect(scene.width).toBeGreaterThan(viewport.width * 0.5);
+  expect(scene.height).toBeGreaterThan(160);
+  expect(buttons.y + buttons.height).toBeLessThanOrEqual(viewport.height);
+});

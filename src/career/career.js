@@ -262,7 +262,7 @@ function createWorkshop(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.46;
+  renderer.toneMappingExposure = 1.14;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -271,7 +271,7 @@ function createWorkshop(canvas) {
   scene.fog = new THREE.Fog(0x8c9eaa, 13, 27);
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
   const target = new THREE.Vector3(-0.05, 1.48, 0);
-  const initialOffset = new THREE.Vector3(3.7, 2.2, 6.1);
+  const initialOffset = new THREE.Vector3(3.1, 1.95, 4.9);
   const spherical = new THREE.Spherical().setFromVector3(initialOffset);
   let panMode = false;
   function updateCamera() {
@@ -299,9 +299,9 @@ function createWorkshop(canvas) {
   }
   updateCamera();
 
-  const ambient = new THREE.HemisphereLight(0xffffff, 0x728394, 3.3);
+  const ambient = new THREE.HemisphereLight(0xffffff, 0x728394, 2.6);
   scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xfff7e9, 4.2);
+  const key = new THREE.DirectionalLight(0xfff7e9, 3.4);
   key.position.set(-3, 8, 4);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -311,11 +311,11 @@ function createWorkshop(canvas) {
   key.shadow.camera.bottom = -7;
   key.shadow.normalBias = 0.035;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xd4eafa, 2.4);
+  const fill = new THREE.DirectionalLight(0xd4eafa, 1.8);
   fill.position.set(5, 3, -4);
   scene.add(fill);
 
-  const steel = new THREE.MeshStandardMaterial({ color: 0xb3c6cf, roughness: 0.44, metalness: 0.45 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x8da2ad, roughness: 0.44, metalness: 0.37 });
   const blackSteel = new THREE.MeshStandardMaterial({ color: 0x425967, roughness: 0.53, metalness: 0.38 });
   const darkRubber = new THREE.MeshStandardMaterial({ color: 0x20262b, roughness: 0.86, metalness: 0.02 });
   const wood = new THREE.MeshStandardMaterial({ color: 0xb0a18a, roughness: 0.87 });
