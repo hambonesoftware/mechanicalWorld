@@ -117,14 +117,25 @@ test("direct caliper dragging produces a real recorded height reading",async({pa
   await page.locator("#zeroTool").click();
   await expect(page.locator("#zeroTool")).toBeHidden();
   await expect(page.locator("#seatJaws")).toBeVisible();
+  // The in-world help stays visible after zeroing, until the first real
+  // interaction with the instrument, rather than disappearing too early.
+  await expect(page.locator("#contactGuide")).toBeVisible();
 
   const grip=page.locator("#jawGrip");
   const gripRect=await grip.boundingBox();
+  const canvasRect=await canvas.boundingBox();
+  const touchX=gripRect.x+gripRect.width/2;
+  expect(touchX).toBeGreaterThan(canvasRect.x+canvasRect.width*0.12);
+  expect(gripRect.x+gripRect.width).toBeLessThan(canvasRect.x+canvasRect.width*0.94);
+  const hintRect=await page.locator("#contactGuide").boundingBox();
+  expect(hintRect.x).toBeGreaterThanOrEqual(canvasRect.x-2);
+  expect(hintRect.x+hintRect.width).toBeLessThanOrEqual(canvasRect.x+canvasRect.width+2);
   const gx=gripRect.x+gripRect.width/2;
   const gy=gripRect.y+gripRect.height/2;
   const travel=Math.max(105,Math.min(215,rect.height*0.52));
   const slide=travel*200/250;
   await grip.dispatchEvent("pointerdown",{pointerId:42,pointerType:"touch",clientX:gx,clientY:gy});
+  await expect(page.locator("#contactGuide")).toBeHidden();
   await grip.dispatchEvent("pointermove",{pointerId:42,pointerType:"touch",clientX:gx,clientY:gy-slide});
   await grip.dispatchEvent("pointerup",{pointerId:42,pointerType:"touch",clientX:gx,clientY:gy-slide});
   await expect(page.locator("#meterState")).toHaveText("CONTACT ✓");

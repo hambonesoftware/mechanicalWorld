@@ -101,8 +101,7 @@ function zeroTool() {
     return;
   }
   state.zeroed[state.tool] = true;
-  state.firstInteraction=true;
-  $("contactGuide").hidden=true;
+  // Keep the in-world hint until the player first touches the moving jaw.
   state.opening = 0;
   state.reading = null;
   renderControlState();
@@ -546,7 +545,7 @@ function createWorkshop(canvas) {
     const grip=$("jawGrip");
     grip.style.left=x+"px";
     grip.style.top=y+"px";
-    $("contactGuide").style.left=x+"px";
+    $("contactGuide").style.left=THREE.MathUtils.clamp(x,70,width-70)+"px";
     $("contactGuide").style.top=(y-43)+"px";
   }
 
@@ -620,6 +619,7 @@ function createWorkshop(canvas) {
     gripPointer={id:event.pointerId,x:event.clientX,y:event.clientY,opening:state.opening,moved:false};
     try{grip.setPointerCapture(event.pointerId);}catch{/* synthetic pointer */}
     grip.classList.add("dragging");
+    state.firstInteraction=true;
     $("contactGuide").hidden=true;
     if(!state.zeroed[state.tool])feedback("Close jaws and zero the tool first, then slide to the part.","warning");
   });
