@@ -112,6 +112,11 @@ function updateChallengeHeader() {
   $("challengeNumber").textContent = String(settings.challengeIndex + 1).padStart(2, "0") + " / " + String(CHALLENGES.length).padStart(2, "0");
   $("challengeTitle").textContent = level.name;
   $("objectiveText").textContent = "Support " + level.loadKN + " kN · ≤ " + level.maxDeflectionMM + " mm deflection";
+  if (new URLSearchParams(window.location.search).has("career") && settings.challengeIndex === 0) {
+    $("labChip").textContent = "WO 002";
+    $("challengeTitle").textContent = "Proof-load verification";
+    $("objectiveText").textContent = "Mike: Run a 12 kN proof load. Confirm the beam meets the drawing's deflection and safety-factor requirements.";
+  }
   $("loadTarget").textContent = n(settings.targetLoad, 1) + " kN test";
   playHUD?.setMetric("target", n(settings.targetLoad, 1) + " kN");
 }

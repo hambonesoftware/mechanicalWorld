@@ -227,6 +227,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let brokenBody = null;
   let brokenVisual = null;
   let brokenFallbackTime = 0;
+  let brokenStallTime = 0;
   let fractureStarted = false;
   let lastCrackStep = -1;
   let brokenLocalLowestY = 0;
@@ -308,6 +309,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     brokenVisual = null;
     fractureStarted = false;
     brokenFallbackTime = 0;
+    brokenStallTime = 0;
     brokenLocalLowestY = 0;
     brokenStartY = 0;
     lastDisplayLowestY = BEAM_Y;
@@ -437,6 +439,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   function releaseFracture(config, mechanics, solution, damage) {
     if (fractureStarted) return false;
     fractureStarted = true;
+    brokenStallTime = 0;
     const rootLength = Math.min(0.23, config.length * 0.22);
     const freeCenter = (rootLength + config.length) / 2;
     const freeCenterBend = beamVisualPose(config, solution, freeCenter, {
@@ -707,12 +710,23 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
         frameAccumulator -= 1 / 60;
         steps += 1;
       }
-      if (brokenBody && brokenVisual) {
+      if (brokenBody && brokenVisual && brokenFallbackTime <= 0) {
         const tr = brokenBody.translation();
         const rot = brokenBody.rotation();
         brokenVisual.position.set(tr.x, tr.y, tr.z);
         brokenVisual.quaternion.set(rot.x, rot.y, rot.z, rot.w);
-        ruptureDropDistanceM = Math.max(ruptureDropDistanceM, brokenStartY - tr.y);
+        const actualDrop = brokenStartY - tr.y;
+        ruptureDropDistanceM = Math.max(ruptureDropDistanceM, actualDrop);
+        // Certain WebAssembly/browser combinations can leave a valid dynamic
+        // Rapier body frozen at release despite nonzero mass and world steps.
+        // Keep Rapier as the normal path, but recover the visual separation
+        // with the existing gravity/plate-clearance fallback if it has made
+        // no appreciable downward progress after a quarter second.
+        brokenStallTime = actualDrop < 0.015 ? brokenStallTime + dt : 0;
+        if (brokenStallTime > 0.24) {
+          brokenFallbackTime = 0.001;
+          console.warn("Detached Rapier body stalled; using visual gravity fallback.");
+        }
       }
       if (weightBody && weightMesh) {
         const translation = weightBody.translation();
