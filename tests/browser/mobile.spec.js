@@ -166,6 +166,23 @@ test("full commanded overload shows cracking, tearing and a detached specimen", 
   expect(audit.scene.ruptureInitialLowestY).toBeGreaterThan(0.28);
   expect(audit.scene.stationaryAndMovingPieces).toBe(2);
   expect(audit.scene.intactBeamVisible).toBe(false);
+  // A numeric seam is not enough. The loose beam must actually move away
+  // from the clamp and be visibly separated on a phone-sized viewport.
+  await expect.poll(async () => page.evaluate(() =>
+    window.redlineVisualDebug?.().ruptureDropDistanceM || 0
+  ), { timeout: 5500 }).toBeGreaterThan(0.24);
+  await expect.poll(async () => page.evaluate(() =>
+    window.redlineVisualDebug?.().fractureGapPixels || 0
+  ), { timeout: 5500 }).toBeGreaterThan(30);
+  await expect(page.locator("#resultCard")).toHaveClass(/fracture-compact/);
+  await expect(page.locator("#resultExpand")).toBeVisible();
+  const resultBounds = await page.locator("#resultCard").boundingBox();
+  expect(resultBounds.height).toBeLessThan(190);
+  await page.screenshot({path:"test-results/iphone-portrait-fracture-visible.png"});
+  await page.locator("#resultExpand").click();
+  await expect(page.locator("#resultDetail")).toBeVisible();
+  await page.locator("#resultExpand").click();
+  await expect(page.locator("#resultDetail")).toBeHidden();
   // Verify the REAL final rendered geometry, not the loading-stage gap.
   // Formerly the final pieces silently used left/right instead of root/free,
   // closing every slit at rupture.

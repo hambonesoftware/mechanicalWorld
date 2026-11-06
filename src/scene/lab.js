@@ -235,6 +235,9 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
   let ruptureInitialLowestY = null;
   let ruptureInitialGapM = null;
   let ruptureExposedFaces = 0;
+  let ruptureRootGroup = null;
+  let ruptureDropDistanceM = 0;
+  let fractureView = null;
   let fractureLayersOpened = 0;
   let fractureMaximumOpening = 0;
 
@@ -307,6 +310,9 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     ruptureInitialLowestY = null;
     ruptureInitialGapM = null;
     ruptureExposedFaces = 0;
+    ruptureRootGroup = null;
+    ruptureDropDistanceM = 0;
+    fractureView = null;
     fractureLayersOpened = 0;
     fractureMaximumOpening = 0;
     lastCrackStep = -1;
@@ -435,6 +441,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     const root = new THREE.Group();
     root.position.set(BASE_X, BEAM_Y, 0);
     damageDebris.add(root);
+    ruptureRootGroup = root;
     addCurvedFragment(root, config, mechanics, solution, damage,
       0, rootLength, 0, 0, "root");
 
@@ -460,6 +467,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     // Both pieces are drawn using the precise display pose field of the
     // intact beam at rupture. Hide the original only AFTER both exist.
     beamGroup.visible = false;
+    focusFracture(config);
     removeDynamicMeshes(crackGroup);
 
     if (world && rapier) {
@@ -539,6 +547,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
 
   function focusCamera(config = lastConfig, beamOnly = true, mode = lastSceneMode) {
     if (!config) return;
+    fractureView = null;
     lastFullFrame = !beamOnly;
     lastSceneMode = mode;
     const viewport = canvas.getBoundingClientRect();
@@ -565,6 +574,31 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     orbit.update();
   }
 
+  function focusFracture(config = lastConfig) {
+    if (!config) return;
+    const viewport = canvas.getBoundingClientRect();
+    const aspect = Math.max(0.32, viewport.width / Math.max(1, viewport.height));
+    const fov = THREE.MathUtils.degToRad(camera.fov);
+    const horizontalFov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+    // A close fracture view, not the distant whole-machine camera.
+    // Keep the clamp and roughly the first half of the falling specimen.
+    const span = Math.min(config.length + 0.35, 1.62);
+    const distance = Math.min(12, Math.max(
+      span / (2 * Math.tan(horizontalFov / 2)) * 1.07,
+      1.18 / (2 * Math.tan(fov / 2)) * 1.12,
+      2.75
+    ));
+    const centerX = BASE_X + Math.min(config.length * 0.34, 0.66);
+    const centerY = BEAM_Y - 0.16;
+    const target = new THREE.Vector3(centerX, centerY, 0);
+    const position = new THREE.Vector3(
+      centerX + distance * 0.11,
+      centerY + distance * 0.18,
+      distance * 0.98
+    );
+    fractureView = { target, position, started: performance.now() };
+  }
+
   function setViewForMode(mode, config) {
     focusCamera(config, !lastFullFrame, mode);
   }
@@ -575,7 +609,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       Math.abs(rect.centerX - cameraSafeFrame.centerX) > 20 ||
       Math.abs(rect.centerY - cameraSafeFrame.centerY) > 20;
     cameraSafeFrame = rect;
-    if (changed && lastConfig) focusCamera(lastConfig, !lastFullFrame, lastSceneMode);
+    if (changed && lastConfig && !fractureView) focusCamera(lastConfig, !lastFullFrame, lastSceneMode);
   }
 
   function worldToScreen(worldPoint) {
@@ -648,6 +682,7 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
         const rot = brokenBody.rotation();
         brokenVisual.position.set(tr.x, tr.y, tr.z);
         brokenVisual.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+        ruptureDropDistanceM = Math.max(ruptureDropDistanceM, brokenStartY - tr.y);
       }
       if (weightBody && weightMesh) {
         const translation = weightBody.translation();
@@ -665,14 +700,37 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       );
       // The no-Rapier fallback does not rotate into the plate.
       brokenVisual.rotation.z = 0;
+      ruptureDropDistanceM = Math.max(ruptureDropDistanceM, brokenStartY - brokenVisual.position.y);
     }
     resize();
+    if (fractureView) {
+      const alpha = 1 - Math.exp(-dt * 5.2);
+      orbit.target.lerp(fractureView.target, alpha);
+      camera.position.lerp(fractureView.position, alpha);
+      if (camera.position.distanceTo(fractureView.position) < 0.005 &&
+          orbit.target.distanceTo(fractureView.target) < 0.005) {
+        fractureView = null;
+      }
+    }
     orbit.update();
     renderer.render(scene, camera);
   }
   animationId = requestAnimationFrame(frame);
 
   function getVisualDiagnostics() {
+    let fractureGapPixels = null;
+    if (ruptureRootGroup && brokenVisual &&
+        ruptureRootGroup.children.length && brokenVisual.children.length) {
+      ruptureRootGroup.updateMatrixWorld(true);
+      brokenVisual.updateMatrixWorld(true);
+      const a = fractureFaceCentroid(ruptureRootGroup.children[0], 0).project(camera);
+      const b = fractureFaceCentroid(brokenVisual.children[0], 1).project(camera);
+      const viewport = canvas.getBoundingClientRect();
+      fractureGapPixels = Math.hypot(
+        (a.x - b.x) * viewport.width / 2,
+        (a.y - b.y) * viewport.height / 2
+      );
+    }
     return {
       floorTop: DISPLAY_FLOOR_TOP,
       lowestDisplayedSurface: lastDisplayLowestY,
@@ -685,6 +743,8 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
       stationaryAndMovingPieces: damageDebris.children.length,
       ruptureInitialGapM,
       ruptureExposedFaces,
+      ruptureDropDistanceM,
+      fractureGapPixels,
       fractureLayersOpened,
       fractureMaximumOpening,
       actualOpenFaces: fractureLayersOpened * 2

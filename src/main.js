@@ -364,6 +364,10 @@ function announceResult(data, destructive = false, cycle = "load") {
   playHUD?.setPhase("result");
   $("resultCard").hidden = false;
   $("resultCard").classList.toggle("failed", !success && !unloading);
+  $("resultCard").classList.toggle("fracture-compact", ruptured);
+  $("resultExpand").hidden = !ruptured;
+  $("resultExpand").setAttribute("aria-expanded", "false");
+  $("resultExpand").textContent = "Details ↓";
   $("resultIcon").textContent = unloading ? "↘" : success ? "✓" : "!";
   $("unloadTest").hidden = ruptured || settings.current.forceKN < 0.05;
   $("reloadTest").hidden = ruptured || settings.current.forceKN > 0.05 || !settings.lastTargetKN;
@@ -519,6 +523,12 @@ function connectControls() {
   $("modeTest").addEventListener("click", () => runTest());
   $("closeBuild").addEventListener("click", () => setMode("ready"));
   $("closeInspect").addEventListener("click", () => setMode("ready"));
+  $("resultExpand").addEventListener("click", () => {
+    const card = $("resultCard");
+    const expanded = card.classList.toggle("fracture-compact") === false;
+    $("resultExpand").setAttribute("aria-expanded", String(expanded));
+    $("resultExpand").textContent = expanded ? "Close ↑" : "Details ↓";
+  });
   $("retryTest").addEventListener("click", () => runTest());
   $("unloadTest").addEventListener("click", () => runTest({ cycle: "unload" }));
   $("reloadTest").addEventListener("click", () => runTest({ cycle: "reload" }));

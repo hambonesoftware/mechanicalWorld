@@ -75,3 +75,14 @@ test("final fracture uses the same root/free seam identifiers as progressive tea
   assert.doesNotMatch(scene,/freeCenter, freeCenterBend, "left"/);
   assert.doesNotMatch(scene,/0, rootLength, 0, 0, "right"/);
 });
+
+
+test("post-rupture scene prioritizes visible motion and a compact report", () => {
+  const lab = readFileSync(new URL("../src/scene/lab.js", import.meta.url), "utf8");
+  assert.match(lab,/ruptureDropDistanceM/);
+  assert.match(lab,/fractureGapPixels/);
+  assert.match(lab,/function focusFracture/);
+  assert.match(html,/id="resultExpand"/);
+  assert.match(css,/result-card\.fracture-compact/);
+  assert.match(js,/fracture-compact/);
+});

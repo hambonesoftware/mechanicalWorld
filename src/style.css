@@ -303,3 +303,49 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
 @media(prefers-reduced-motion:reduce){
   #forceDeflectionCurve *,#historyScrubber{transition:none!important}
 }
+
+
+/* Post-fracture: the specimen remains the main visual, not a huge result modal.
+ * The detailed report is one tap away. Real game controls stay accessible. */
+.result-card.fracture-compact{
+  padding:9px 12px;
+  max-height:none!important;
+  overflow:visible;
+  background:#3b3032dc;
+  backdrop-filter:blur(8px);
+}
+.result-card.fracture-compact .result-heading{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.result-card.fracture-compact .result-heading>div{
+  flex:1;
+  min-width:0;
+}
+.result-card.fracture-compact #resultDetail{display:none!important}
+.result-card.fracture-compact .result-buttons{
+  margin-top:8px;
+  gap:6px;
+}
+.result-card.fracture-compact #resultIcon{
+  width:27px;height:27px;font-size:15px
+}
+.result-expand{
+  min-height:44px;
+  flex:none;
+  border:1px solid #d6a898;
+  border-radius:8px;
+  background:#243843;
+  color:#f9e3d7;
+  padding:0 11px;
+  font:800 12px system-ui,sans-serif;
+}
+.result-expand[hidden]{display:none!important}
+@media(max-width:540px){
+ .result-card.fracture-compact{max-width:calc(100vw - 22px);left:11px;right:11px}
+ .result-card.fracture-compact .result-heading strong{font-size:12px;letter-spacing:.2px}
+ .result-card.fracture-compact .result-buttons button{min-height:43px}
+ .result-card.fracture-compact .result-buttons{display:flex;flex-wrap:wrap}
+ .result-card.fracture-compact .result-buttons button{flex:1 1 26%}
+}
