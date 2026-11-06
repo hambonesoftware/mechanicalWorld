@@ -1,145 +1,177 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18232d">
-  <meta name="description" content="REDLINE Engineering Career: start your first shift, read work orders and inspect real 3D parts.">
+  <meta name="theme-color" content="#15232d">
+  <meta name="description" content="REDLINE career mode: inspect real 3D parts, use measuring tools and build an engineering career.">
   <link rel="icon" href="%BASE_URL%icon.svg">
-  <title>REDLINE | First Day on the Job</title>
-  <link rel="stylesheet" href="/src/career/career.css">
-  <script type="module" src="/src/career/career.js"></script>
+  <title>REDLINE | Engineering Career</title>
+  <link rel="stylesheet" href="/src/career/workstation.css">
+  <script type="module" src="/src/career/workstation.js"></script>
 </head>
 <body>
 <div class="career-app" id="careerApp">
-  <header class="app-header">
-    <a href="./" class="mark" title="Return to the REDLINE test lab"><span class="mark-icon">R<span>.</span></span><span class="mark-text">REDLINE<small>ENGINEERING DIVISION</small></span></a>
-    <div class="header-center"><span class="live-dot"></span><span>DAY 01</span><span class="header-separator">/</span><span>FIRST SHIFT</span></div>
-    <div class="employee-chip"><span class="employee-icon">E1</span><span><strong id="rankLabel">Engineering Trainee</strong><small><span id="xpCount">0</span> XP · PERSONNEL FILE</small></span></div>
+  <header class="topbar">
+    <a href="./" class="brand" aria-label="REDLINE main laboratory">
+      <span class="brand-icon">R<span>.</span></span>
+      <span class="brand-copy">REDLINE<small>ENGINEERING CAREER</small></span>
+    </a>
+    <div class="career-identity"><span class="role" id="rankLabel">Engineering Trainee</span><span class="experience"><span id="xpCount">0</span> XP</span></div>
   </header>
-  <nav class="mobile-nav" aria-label="Workstation panels">
-    <button type="button" data-pane="brief" class="selected" aria-pressed="true">01 <b>Work order</b></button>
-    <button type="button" data-pane="bench" aria-pressed="false">02 <b>Workbench</b></button>
-    <button type="button" data-pane="report" aria-pressed="false">03 <b>Inspection</b></button>
-  </nav>
-  <main class="work-layout">
-    <aside class="panel brief-panel mobile-active" data-panel="brief">
-      <div class="panel-topline"><span class="tag orange">ASSIGNED</span><span>WO-001 / REV A</span></div>
-      <p class="eyebrow">INCOMING QUALITY CONTROL</p>
-      <h1>First day.<br><em>First inspection.</em></h1>
-      <div class="supervisor">
-        <span class="portrait">MR</span>
-        <div><b>Mike Reynolds</b><small>Shop supervisor</small></div>
-        <span class="radio-icon">● RADIO</span>
-      </div>
-      <blockquote id="mentorText">"Morning, rookie. That I-beam just came in. Before anybody bolts it into the rig, I need you to check it against the print. Take your time. Good measurements beat fast guesses."</blockquote>
-      <button id="goBench" type="button" class="button button-primary full start-cta">Start measuring now <span>→</span></button>
-      <p class="start-hint">Touch the orange caliper handle in the 3D workbench. Follow the instructions below when you need them.</p>
-      <div class="order-heading"><h2>Instructions</h2><span>PROCEDURE 01–06</span></div>
-      <ol class="instructions">
-        <li><span>01</span><p>Check the drawing and identify the three required dimensions.</p></li>
-        <li><span>02</span><p>Select the <strong>digital caliper</strong>, close the jaws and press ZERO.</p></li>
-        <li><span>03</span><p>Measure the height and flange width. Bring the jaws near the part, then seat them.</p></li>
-        <li><span>04</span><p>Select and zero the <strong>micrometer</strong> for the thin web.</p></li>
-        <li><span>05</span><p>Transfer readings to the inspection report and compare them to drawing limits.</p></li>
-        <li><span>06</span><p>Choose ACCEPT or REJECT, then submit your signed report.</p></li>
-      </ol>
-      <div class="order-footer"><span>REWARD</span><strong>+100 XP</strong><span>·</span><strong>Workstation access</strong></div>
-      
-      <a href="./" class="quiet-link">Existing beam test lab / Sandbox ↗</a>
-    </aside>
 
-    <section class="panel bench-panel" data-panel="bench" aria-label="Interactive measuring workbench">
-      <div class="bench-header">
-        <div><p class="eyebrow">METROLOGY STATION / BENCH 01</p><h2>Inspect the part</h2></div>
-        <span class="tag">STOCK 3042-B</span>
+  <main class="game-main">
+    <div class="task-header">
+      <div class="task-copy">
+        <div class="mission-meta"><span class="current-order">WO–001</span><span id="taskProgress">0 OF 3 MEASUREMENTS</span></div>
+        <h1 id="taskTitle">Measure overall height</h1>
       </div>
-      <div class="scene-wrap" id="sceneWrap">
-        <canvas id="workbench3d" aria-label="Interactive 3D bench. Drag a finger to orbit, use two fingers to pan and pinch to zoom, or select Pan mode. Tap the part to select a feature." tabindex="0"></canvas>
-        <div class="scene-label"><span class="live-dot"></span> LIVE WORKBENCH <span class="separator">/</span> PART 3042-B</div>
-        <div class="scene-camera-tools" role="group" aria-label="3D camera controls">
-          <button id="zoomIn" type="button" aria-label="Zoom in on workbench" title="Zoom in">+</button>
-          <button id="zoomOut" type="button" aria-label="Zoom out from workbench" title="Zoom out">−</button>
-          <button id="panMode" type="button" aria-label="Switch between rotate and pan touch gestures" aria-pressed="false" title="Drag to pan">✥ <span>PAN</span></button>
-          <button id="resetView" type="button" aria-label="Reset 3D camera to default view" title="Reset view">⟲</button>
-        </div>
-        <div id="jawGrip" class="jaw-grip" role="slider" aria-label="Drag the orange caliper jaw handle to adjust opening" aria-valuemin="0" aria-valuemax="250" aria-valuenow="0" tabindex="0">
-          <span class="grip-symbol" id="gripSymbol">↕</span><span class="grip-title">DRAG JAW</span>
-        </div>
-        <div class="scene-gesture-hint" id="gestureHint">↻ Rotate with one finger · Pinch to zoom · Two fingers to pan</div>
-        <div class="scene-corner" id="sceneCorner">Touch the orange jaw handle to measure</div>
-        <div class="scene-error" id="sceneError" hidden>3D graphics unavailable. The measurement station controls remain usable.</div>
-      </div>
-      <div class="measure-controls" id="measureControls">
-        <div class="bench-guidance"><span id="guideStep">STEP 1 OF 3</span><strong id="guideTitle">Zero the digital caliper</strong><p id="guideDetail">Close the jaws, then tap Set zero. The orange grip above is your direct touch control.</p></div>
-        <div class="control-heading"><strong>01 <span>Select a feature</span></strong><small>Choose what to measure</small></div>
-        <div class="feature-grid" role="group" aria-label="Part features">
-          <button class="feature selected" type="button" data-feature="height" aria-pressed="true"><span>OVERALL HEIGHT</span><b>H</b><small>±0.5 mm</small></button>
-          <button class="feature" type="button" data-feature="flange" aria-pressed="false"><span>FLANGE WIDTH</span><b>W</b><small>±0.5 mm</small></button>
-          <button class="feature" type="button" data-feature="web" aria-pressed="false"><span>WEB THICKNESS</span><b>t</b><small>±0.2 mm</small></button>
-        </div>
-        <div class="control-heading compact"><strong>02 <span>Choose your instrument</span></strong><small id="toolHint">Digital caliper required</small></div>
-        <div class="tool-row" role="group" aria-label="Measuring tool">
-          <button class="tool selected" type="button" data-tool="caliper" aria-pressed="true">▤ <span>Digital caliper</span><small id="caliperStatus">Not zeroed</small></button>
-          <button class="tool" type="button" data-tool="micrometer" aria-pressed="false">◉ <span>Micrometer</span><small id="micrometerStatus">Not zeroed</small></button>
-        </div>
-        <div class="meter-console">
-          <div class="meter-heading"><span id="meterName">DIGITAL CALIPER</span><span id="meterZero">ZERO REQUIRED</span></div>
-          <div class="meter-display"><span id="meterReading">--.--</span><small>mm</small><span id="meterState">OPEN JAWS</span></div>
-          <label for="jawOpening">Jaw opening · fine adjustment <output id="openingValue">0.00 mm</output></label>
-          <input type="range" id="jawOpening" min="0" max="250" step="0.01" value="0" aria-label="Drag jaws to approximate the measurement">
-          <div class="jaw-buttons">
-            <button type="button" id="jawMinus" aria-label="Close jaws by 0.1 millimetre">− 0.1</button>
-            <button type="button" id="jawPlus" aria-label="Open jaws by 0.1 millimetre">+ 0.1</button>
-          </div>
-          <p class="status" id="measureStatus" role="status" aria-live="polite">Touch the orange grip on the tool in the 3D view, or use the fine-adjust slider.</p>
+      <button class="icon-action" id="openWorkOrder" type="button" aria-label="Open work order" title="Work order">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l4 4v14H4V3z"/><path d="M16 3v5h4M8 12h8M8 16h8"/></svg>
+        <span>ORDER</span>
+      </button>
+    </div>
 
-        </div>
+    <section class="work-scene" id="sceneWrap" aria-label="3D measuring station">
+      <canvas id="workbench3d" aria-label="Close-up 3D I-beam and measuring tool. Drag the orange tool grip to move the jaws. Drag the scene to rotate; pinch to zoom." tabindex="0"></canvas>
+      <div class="dimension-card" aria-live="polite">
+        <span id="targetDimensionLabel">OVERALL HEIGHT · H</span>
+        <strong id="targetDimension">200.00 <small>± 0.50 mm</small></strong>
       </div>
-      <div class="console-actions bench-actionbar" aria-label="Measurement actions">
-        <button id="zeroTool" class="button button-outline" type="button">1 · Set zero</button>
-        <button id="seatJaws" class="button button-outline" type="button">2 · Touch off</button>
-        <button id="transferReading" class="button button-primary" type="button" disabled>3 · Record →</button>
+      <div class="scene-tools" role="group" aria-label="Camera controls">
+        <button id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+        <button id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+        <button id="panMode" type="button" aria-label="Enable drag-to-pan" aria-pressed="false" title="Drag to pan">✥</button>
+        <button id="resetView" type="button" aria-label="Reset camera view" title="Reset view">⟲</button>
       </div>
+      <div id="jawGrip" class="jaw-grip" role="slider" aria-label="Drag the movable measuring jaw" aria-valuemin="0" aria-valuemax="250" aria-valuenow="0" tabindex="0"><span id="gripSymbol">↑</span><small>DRAG</small></div>
+      <div class="scene-feedback" id="sceneCorner">Close the jaws, then set zero.</div>
+      <div class="scene-gesture" id="gestureHint">One finger: rotate · Pinch: zoom · Two fingers: pan</div>
+      <div class="scene-error" id="sceneError" hidden>3D is not available on this device. You can still operate the digital measuring controls below.</div>
     </section>
 
-    <aside class="panel report-panel" data-panel="report">
-      <div class="panel-topline"><span class="tag">QUALITY</span><span>INSPECTION REPORT</span></div>
-      <h2>Drawing 3042-B</h2>
-      <div class="drawing" role="img" aria-label="I-beam section: overall height 200 plus or minus 0.5 mm, flange width 120 plus or minus 0.5 mm, web thickness 8 plus or minus 0.2 mm.">
-        <svg viewBox="0 0 300 210" xmlns="http://www.w3.org/2000/svg">
-          <defs><pattern id="hatch" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(35)"><line x1="0" y1="0" x2="0" y2="5" stroke="#bac1c8" stroke-width="1"/></pattern></defs>
-          <path d="M105 42 H223 V59 H169 V155 H223 V172 H105 V155 H159 V59 H105 Z" fill="url(#hatch)" stroke="#313d49" stroke-width="2.5"/>
-          <g stroke="#76818b" stroke-width="1.1" fill="none"><path d="M105 36 V15 M223 36 V15 M105 24 H223"/><path d="M96 42 H60 M96 172 H60 M71 42 V172"/><path d="M159 91 V78 M169 91 V78 M159 82 H169"/><path d="M230 155 H247 M230 172 H247 M242 155 V172"/></g>
-          <g fill="#455767"><path d="M105 24 l6 -3 v6 Z M223 24 l-6 -3 v6 Z M71 42 l-3 6 h6 Z M71 172 l-3 -6 h6 Z"/></g>
-          <g fill="#344354" font-family="Arial, sans-serif" text-anchor="middle" font-size="11" font-weight="bold">
-            <text x="164" y="12">120 ± 0.5</text><text x="53" y="107" transform="rotate(-90 53 107)">200 ± 0.5</text><text x="165" y="74" font-size="9">8 ± 0.2</text><text x="264" y="164" font-size="9">12 REF</text><text x="164" y="197" font-size="8" letter-spacing="1">SECTION A–A · MILLIMETRES</text>
+    <section class="work-controls" aria-label="Inspection controls">
+      <div class="feature-strip" role="group" aria-label="Select dimension to inspect">
+        <button type="button" class="feature is-active" data-feature="height" aria-pressed="true">
+          <span class="feature-letter">H</span><span class="feature-copy"><strong>Height</strong><small id="feature-height-status">200 ± 0.5</small></span>
+        </button>
+        <button type="button" class="feature" data-feature="flange" aria-pressed="false">
+          <span class="feature-letter">W</span><span class="feature-copy"><strong>Flange</strong><small id="feature-flange-status">120 ± 0.5</small></span>
+        </button>
+        <button type="button" class="feature" data-feature="web" aria-pressed="false">
+          <span class="feature-letter">t</span><span class="feature-copy"><strong>Web</strong><small id="feature-web-status">8 ± 0.2</small></span>
+        </button>
+      </div>
+
+      <div class="instrument-row">
+        <button type="button" id="toolPicker" class="tool-picker" aria-label="Change measuring instrument" title="Change measuring instrument">
+          <span class="tool-icon" id="toolIcon">▤</span>
+          <span class="tool-name"><strong id="meterName">DIGITAL CALIPER</strong><small id="toolHint">Tap to change instrument</small></span>
+          <span class="tool-chevron">⌄</span>
+        </button>
+        <div class="digital-readout" aria-live="polite">
+          <span id="meterReading">--.--</span><span class="unit">mm</span>
+          <small id="meterState">JAW OPENING</small>
+        </div>
+      </div>
+
+      <div class="fine-control">
+        <div class="fine-header"><label for="jawOpening">Jaw adjustment</label><output id="openingValue">0.00 mm</output></div>
+        <div class="range-row">
+          <button type="button" id="jawMinus" aria-label="Close jaws 0.1 millimetre">−</button>
+          <input type="range" id="jawOpening" min="0" max="250" step="0.01" value="0" aria-label="Fine-adjust instrument jaws">
+          <button type="button" id="jawPlus" aria-label="Open jaws 0.1 millimetre">+</button>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button type="button" class="main-action" id="zeroTool">ZERO CALIPER <span>→</span></button>
+        <button type="button" class="main-action" id="seatJaws" hidden>TOUCH OFF PART <span>→</span></button>
+        <button type="button" class="main-action" id="transferReading" hidden disabled>RECORD READING <span>✓</span></button>
+      </div>
+      <p class="instruction" id="measureStatus" role="status" aria-live="polite">The jaws are closed. Set zero to begin measuring.</p>
+      <div hidden class="diagnostic-legacy" aria-hidden="true"><span id="meterZero"></span><span id="caliperStatus"></span><span id="micrometerStatus"></span><span id="guideStep"></span><span id="guideTitle"></span><span id="guideDetail"></span><span id="gripTitle"></span></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Reference materials">
+    <button type="button" id="openDrawing"><span aria-hidden="true">⌗</span> Drawing</button>
+    <div class="nav-separator"></div>
+    <button type="button" id="openReport"><span aria-hidden="true">▤</span> Inspection <span class="count" id="reportCount">0/3</span></button>
+  </nav>
+
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+
+  <section id="workOrderSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="workOrderTitle" hidden>
+    <header class="sheet-top"><span>ENGINEERING DEPARTMENT · WO–001</span><button type="button" id="closeWorkOrder" aria-label="Close work order">✕</button></header>
+    <div class="sheet-scroll">
+      <span class="sheet-kicker">YOUR FIRST DAY</span>
+      <h2 id="workOrderTitle">Inspect the incoming beam.</h2>
+      <div class="supervisor"><div class="supervisor-avatar">MR</div><p><strong>Mike Reynolds</strong><small>Shop supervisor</small></p></div>
+      <blockquote id="mentorText">“Morning, rookie. Before this beam goes anywhere near the test rig, check its three dimensions. One bad measurement can stop an expensive mistake.”</blockquote>
+      <div class="order-summary"><span>YOUR OBJECTIVE</span><strong>Measure all three dimensions and decide: ACCEPT or REJECT.</strong></div>
+      <div class="mini-steps"><div><b>01</b><span>Zero your instrument.</span></div><div><b>02</b><span>Drag the jaws to the part and take a reading.</span></div><div><b>03</b><span>Record measurements and sign the inspection.</span></div></div>
+      <p class="training-note">Training specimen · Digital measurements are simulated. The drawing represents nominal dimensions and tolerances.</p>
+    </div>
+    <footer class="sheet-footer"><button type="button" id="goBench" class="main-action">START MEASURING <span>→</span></button></footer>
+  </section>
+
+  <section id="drawingSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="drawingTitle" hidden>
+    <header class="sheet-top"><span>DRAWING · 3042-B · REV A</span><button type="button" id="closeDrawing" aria-label="Close drawing">✕</button></header>
+    <div class="sheet-scroll">
+      <span class="sheet-kicker">REFERENCE PRINT</span>
+      <h2 id="drawingTitle">I-section dimensions</h2>
+      <div class="drawing-paper">
+        <svg viewBox="0 0 300 225" role="img" aria-label="I-section section A-A. Width 120 plus or minus 0.5 mm, height 200 plus or minus 0.5 mm, web 8 plus or minus 0.2 mm.">
+          <defs><pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(35)"><line x1="0" y1="0" x2="0" y2="6" stroke="#b4bdc6" stroke-width="1.2"/></pattern></defs>
+          <path d="M103 45 H224 V64 H173 V156 H224 V175 H103 V156 H154 V64 H103Z" fill="url(#hatch)" stroke="#30434b" stroke-width="2.4"/>
+          <g stroke="#82949a" stroke-width="1.3" fill="none">
+            <path d="M103 38V18M224 38V18M103 26H224"/>
+            <path d="M92 45H59M92 175H59M67 45V175"/>
+            <path d="M154 102V88M173 102V88M154 93H173"/>
+          </g>
+          <g fill="#344e5b" font-family="Arial, sans-serif" text-anchor="middle" font-size="11" font-weight="700">
+            <text x="163" y="13">120 ± 0.5</text><text x="48" y="110" transform="rotate(-90 48 110)">200 ± 0.5</text><text x="164" y="83" font-size="10">8 ± 0.2</text><text x="165" y="207" font-size="9" letter-spacing="1">SECTION A–A · MM · NTS</text>
           </g>
         </svg>
-        <div class="drawing-stamp">REV A <span>TRAINING PRINT · NOT FOR MANUFACTURE</span></div>
+        <div class="drawing-footer"><strong>3042-B</strong><span>REV A · NOT FOR MANUFACTURE</span></div>
       </div>
-      <p class="report-intro">Enter or transfer each measured value. All dimensions must meet the drawing limits to accept a part.</p>
+      <div class="tolerance-list">
+        <div><span>Overall height</span><strong>199.50 – 200.50 mm</strong></div>
+        <div><span>Flange width</span><strong>119.50 – 120.50 mm</strong></div>
+        <div><span>Web thickness</span><strong>7.80 – 8.20 mm</strong></div>
+      </div>
+    </div>
+    <footer class="sheet-footer"><button type="button" id="closeDrawingBottom" class="main-action">BACK TO MEASUREMENT <span>→</span></button></footer>
+  </section>
+
+  <section id="reportSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="reportTitle" hidden>
+    <header class="sheet-top"><span>QUALITY CONTROL · Q-101</span><button type="button" id="closeReport" aria-label="Close report">✕</button></header>
+    <div class="sheet-scroll">
+      <span class="sheet-kicker">INSPECTION REPORT</span>
+      <h2 id="reportTitle">Accept or reject?</h2>
+      <p class="report-summary">Compare the measured values with the limits from Drawing 3042-B. You must actually measure each feature.</p>
       <form id="inspectionForm" novalidate>
-        <div class="report-head"><span>DIMENSION / LIMIT</span><span>MEASURED (mm)</span></div>
-        <div class="report-line"><label for="record-height">Height <small>199.50–200.50</small></label><div><input type="number" id="record-height" name="height" step="0.01" inputmode="decimal" placeholder="—" aria-describedby="error-height"><small class="field-error" id="error-height"></small></div></div>
-        <div class="report-line"><label for="record-flange">Flange width <small>119.50–120.50</small></label><div><input type="number" id="record-flange" name="flange" step="0.01" inputmode="decimal" placeholder="—" aria-describedby="error-flange"><small class="field-error" id="error-flange"></small></div></div>
-        <div class="report-line"><label for="record-web">Web thickness <small>7.80–8.20</small></label><div><input type="number" id="record-web" name="web" step="0.01" inputmode="decimal" placeholder="—" aria-describedby="error-web"><small class="field-error" id="error-web"></small></div></div>
+        <div class="record-row"><label for="record-height">Overall height <small>199.50–200.50 mm</small></label><div><input type="number" id="record-height" inputmode="decimal" step="0.01" placeholder="—" aria-describedby="error-height"><small class="field-error" id="error-height"></small></div></div>
+        <div class="record-row"><label for="record-flange">Flange width <small>119.50–120.50 mm</small></label><div><input type="number" id="record-flange" inputmode="decimal" step="0.01" placeholder="—" aria-describedby="error-flange"><small class="field-error" id="error-flange"></small></div></div>
+        <div class="record-row"><label for="record-web">Web thickness <small>7.80–8.20 mm</small></label><div><input type="number" id="record-web" inputmode="decimal" step="0.01" placeholder="—" aria-describedby="error-web"><small class="field-error" id="error-web"></small></div></div>
         <fieldset class="disposition"><legend>Disposition</legend><label><input type="radio" name="disposition" value="ACCEPT"><span>✓ ACCEPT</span></label><label><input type="radio" name="disposition" value="REJECT"><span>✕ REJECT</span></label></fieldset>
-        <p class="field-error" id="error-disposition" aria-live="polite"></p>
-        <button id="submitReport" type="submit" class="button button-primary full">Submit inspection report <span>→</span></button>
+        <p id="error-disposition" class="field-error" role="alert"></p>
+        <button type="submit" id="submitReport" class="main-action">SUBMIT INSPECTION <span>→</span></button>
       </form>
-      <div class="report-footer"><span>REDLINE QUALITY SYSTEM</span><span>FORM Q-101 · REV A</span></div>
-    </aside>
-  </main>
+    </div>
+    <footer class="sheet-footer sheet-footer--subtle"><button type="button" id="resumeBench">← RETURN TO WORKBENCH</button></footer>
+  </section>
+
   <div id="completionOverlay" class="completion-overlay" role="dialog" aria-modal="true" aria-labelledby="completionTitle" hidden>
     <div class="completion-card">
-      <div class="success-mark">✓</div>
-      <p class="eyebrow">WORK ORDER CLOSED</p>
+      <span class="complete-icon">✓</span>
+      <p class="sheet-kicker">WORK ORDER CLOSED · QUALITY ASSURED</p>
       <h2 id="completionTitle">Good catch, rookie.</h2>
-      <p id="completionMessage">You found an out-of-tolerance web and correctly rejected the part before assembly.</p>
-      <div class="completion-rewards"><div><small>CAREER XP</small><strong id="rewardXP">+100</strong></div><div><small>NEXT STATION</small><strong>Load test rig</strong></div></div>
-      <a class="button button-primary full" href="./?career=1">Continue to work order 002 →</a>
-      <button type="button" class="button button-outline full" id="backToBench">Review inspection</button>
+      <p id="completionMessage">You rejected an out-of-tolerance beam before it reached assembly.</p>
+      <div class="completion-rewards"><div><small>CAREER EXPERIENCE</small><strong id="rewardXP">+100 XP</strong></div><div><small>NEXT ASSIGNMENT</small><strong>Proof-load test</strong></div></div>
+      <a class="main-action" href="./?career=1">CONTINUE TO WORK ORDER 002 <span>→</span></a>
+      <button type="button" class="review-button" id="backToBench">Review inspection</button>
     </div>
   </div>
 </div>
