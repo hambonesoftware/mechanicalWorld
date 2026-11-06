@@ -57,7 +57,13 @@ test("mobile play area and single primary action remain visible without document
   expect(scene.width).toBeGreaterThan(viewport.width*0.95);
   expect(scene.height).toBeGreaterThan(viewport.height*0.95);
   expect(controls.width).toBeGreaterThan(0);
-  expect(controls.height).toBeLessThan(viewport.height*0.52);
+  if(info.project.name==="mobile-landscape"){
+    // Landscape intentionally uses a slim control strip down the right side;
+    // scene ownership is measured by width here, not its panel height.
+    expect(controls.width).toBeLessThan(viewport.width*0.46);
+  }else{
+    expect(controls.height).toBeLessThan(viewport.height*0.52);
+  }
   expect(dock.y+dock.height).toBeLessThanOrEqual(viewport.height);
   await expect(page.locator("#fineControls")).toBeHidden();
   await expect(page.locator("#sceneCameraTools")).toBeHidden();

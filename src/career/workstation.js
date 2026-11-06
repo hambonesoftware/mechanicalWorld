@@ -247,7 +247,7 @@ function createWorkshop(canvas) {
   scene.fog = new THREE.Fog(0x899b9d, 12, 28);
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 40);
   const target = new THREE.Vector3(0, 1.85, 0.20);
-  const startOffset = new THREE.Vector3(1.95, 1.05, 4.90);
+  const startOffset = new THREE.Vector3(3.15, 2.10, 8.10);
   const spherical = new THREE.Spherical().setFromVector3(startOffset);
   let panMode = false;
   const pointers = new Map();
