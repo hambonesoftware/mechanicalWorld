@@ -476,9 +476,15 @@ export async function createLaboratory(canvas, onLoadStatus = () => {}) {
     removeDynamicMeshes(crackGroup);
 
     if (world && rapier) {
+      // Explicitly give the detached beam its physical specimen mass.
+      // The previous low-density collider approximation produced a massless
+      // Rapier body on Chromium/SwiftShader (0 kg, zero gravity response).
+      const freeFraction = (config.length - rootLength) / config.length;
+      const detachedMassKG = Math.max(0.5, mechanics.massKG * freeFraction);
       brokenBody = world.createRigidBody(
         rapier.RigidBodyDesc.dynamic()
           .setTranslation(brokenVisual.position.x, brokenVisual.position.y, 0)
+          .setAdditionalMass(detachedMassKG)
           .setGravityScale(1)
           .setCanSleep(false)
           .setLinvel(0.03, -0.035, 0)
