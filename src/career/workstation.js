@@ -491,7 +491,7 @@ function createWorkshop(canvas) {
   function setFeature(id) {
     if(id==="height"){
       caliper.visible=state.tool==="caliper";
-      caliper.position.set(-0.33,0.94,1.58);
+      caliper.position.set(0.05,0.94,1.58);
       caliper.rotation.z=0;
     } else if(id==="flange"){
       caliper.visible=state.tool==="caliper";
@@ -510,7 +510,7 @@ function createWorkshop(canvas) {
     caliper.visible = tool==="caliper";
     micro.visible = tool==="micrometer";
     if(tool==="caliper"){
-      caliper.position.set(state.feature.id==="height"?-0.33:-0.45,
+      caliper.position.set(state.feature.id==="height"?0.05:-0.45,
         state.feature.id==="height"?0.94:3.11,1.58);
       caliper.rotation.z=state.feature.id==="height"?0:-Math.PI/2;
     }
