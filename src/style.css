@@ -349,3 +349,10 @@ input[type=range]::-moz-range-thumb{height:25px;width:25px;border-radius:50%;bor
  .result-card.fracture-compact .result-buttons{display:flex;flex-wrap:wrap}
  .result-card.fracture-compact .result-buttons button{flex:1 1 26%}
 }
+
+/* First Day career entry is deliberately secondary to the existing simulation HUD. */
+.scene-floating-actions{display:flex;flex-direction:column;align-items:flex-end;gap:9px}
+.career-launch{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 13px;background:#253b43ea;border:1px solid #f4be72;border-radius:12px;color:#ffd39a;font-size:11px;font-weight:900;letter-spacing:1px;text-decoration:none;pointer-events:auto;box-shadow:0 5px 17px #0006}
+.career-launch small{font-size:9px;color:#e5ece8;letter-spacing:0;font-weight:600}
+.career-launch:hover,.career-launch:focus-visible{background:#375159}
+.career-return{display:inline-flex;align-items:center;justify-content:center;min-height:39px;padding:8px 12px;color:#ffd39a;text-decoration:none;border:1px solid #e0ad6c;border-radius:9px;background:#30434c;font-size:12px;font-weight:800}

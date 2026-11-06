@@ -1,4 +1,5 @@
 import { STARTER, CHALLENGES, beamAnalysis, checkChallenge } from "./engineering/beam.js";
+import { completeWorkOrder, readCareer } from "./career/inspection.js";
 import { getBeamSolution } from "./engineering/fem.js";
 import { createPlasticBeam, replayPlasticSnapshot } from "./engineering/plasticity.js";
 import { renderHistoryCurve, historyEntry } from "./ui/history.js";
@@ -396,6 +397,17 @@ function announceResult(data, destructive = false, cycle = "load") {
   $("testIcon").textContent = "↻";
   $("modeTest").disabled = false;
   $("modeTest").setAttribute("aria-pressed", "false");
+  const careerMode = new URLSearchParams(window.location.search).has("career");
+  const careerQualified = careerMode && success && cycle === "load" &&
+    settings.challengeIndex === 0 && readCareer(window.localStorage).completed.includes("WO-001");
+  $("careerReturn").hidden = !careerMode;
+  if (careerQualified) {
+    const award = completeWorkOrder(window.localStorage, "WO-002");
+    $("resultDetail").textContent += award.newlyCompleted
+      ? " · WO-002 signed off: +150 XP. Promotion to Junior Technician unlocked."
+      : " · WO-002 already signed off. Return to your personnel file.";
+    setStatus("Proof-load work order signed off", "passed");
+  }
   $("resultCard").querySelector("#nextChallenge").hidden = !success;
   $("breakTest").hidden = ruptured;
   settings.activeTargetLoad = null;

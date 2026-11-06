@@ -152,3 +152,21 @@ The release renderer now tracks **how far the detached fragment actually falls**
 ### Rigid fragment collision refinement
 
 The detached section now uses four short Rapier colliders aligned with its curved centerline rather than one enormous enclosing box. The latter could support the beam at a physically incorrect location on the platform. The moving body has explicit gravity and sleep disabled and is woken immediately after collider construction. The browser test checks world stepping, rigid-body mass, awake state, actual downward motion, and a readable final gap before deployment.
+
+
+## REDLINE career mode — first day vertical slice
+
+[Start your engineering career](https://hambonesoftware.github.io/mechanicalWorld/career.html) · [Existing structural-test lab](https://hambonesoftware.github.io/mechanicalWorld/)
+
+The career mode introduces an actual entry-level engineering work order before the existing structural simulator:
+
+1. Read supervisor Mike Reynolds's incoming-inspection order and drawing 3042-B.
+2. Select an overall-height or flange-width measurement, zero a digital caliper and move its jaws close to the dimension; seat the jaws to acquire a stable reading.
+3. Switch to an outside micrometer for the web, zero it and measure the thin section.
+4. Transfer the three instrument readings to an inspection report, compare nominal limits and choose a justified ACCEPT/REJECT disposition.
+5. Find the out-of-tolerance web (8.32 mm, allowable 7.80–8.20 mm), earn the first 100 career XP and continue into the 12 kN proof-load challenge (WO-002).
+6. Finish the proof test to earn 150 more XP and the Junior Technician rank.
+
+The workbench includes a procedural Three.js I-beam, movable caliper and micrometer meshes, touch-friendly controls and a paper-style inspection drawing. Gameplay measurements are deterministic, fictional training values; the scene is a teaching representation, not a precision metrology simulation. Underlying career assessment is isolated in `src/career/inspection.js`, with unit tests and mobile end-to-end tests. Career completion and XP are stored locally in the browser's localStorage under `redline-career-v1`, never sent to a server. Clearing site data resets progress. The established beam simulation remains directly available as sandbox mode.
+
+This vertical slice currently covers the first two career orders only. Future chapters will add instrument uncertainty, separate workpieces, supervisor requests, shop-floor machines and engineering decision-making—not just larger loads.
