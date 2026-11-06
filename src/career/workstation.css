@@ -230,3 +230,389 @@ button:disabled{cursor:not-allowed;opacity:.45}
  .sheet{max-height:98dvh}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+
+/* ===============================================================
+   REDLINE · IMMERSIVE LAB PASS (2026-11)
+   The scene is the game. Menus and precision sliders are contextual,
+   not permanent rectangles around the caliper.
+   =============================================================== */
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.career-app{
+  position:relative!important;display:block!important;
+  width:100%!important;height:100dvh!important;min-height:280px;
+  overflow:hidden!important;background:#1a2c2f!important;
+}
+.career-app>.topbar{
+  position:absolute!important;z-index:12!important;
+  top:0;left:0;right:0;
+  height:calc(54px + var(--safe-t))!important;
+  padding:var(--safe-t) 15px 0!important;
+  border:0!important;
+  background:linear-gradient(to bottom,rgba(11,24,27,.93),rgba(11,24,27,.55) 72%,transparent)!important;
+  box-shadow:none!important;
+  pointer-events:none;
+}
+.career-app>.topbar a,.career-app>.topbar button{pointer-events:auto}
+.career-app .brand{font-size:13px;gap:5px}
+.career-app .brand-icon{font-size:29px;letter-spacing:-3px}
+.career-app .brand-copy{font-size:14px;letter-spacing:1px}
+.career-app .brand-copy small{font-size:7px;letter-spacing:1.1px;opacity:.85}
+.career-app .career-identity{gap:4px}
+.career-app .career-identity .role{font-size:10px;color:#e0e9e6}
+.career-app .career-identity .experience{
+  color:#ffd18f;font-weight:900;background:transparent;border:0;
+  padding:3px 0 3px 5px;font-size:11px
+}
+.career-app>.game-main{
+  position:absolute!important;inset:0!important;
+  display:block!important;height:100%!important;overflow:hidden!important
+}
+.career-app .work-scene{
+  position:absolute!important;inset:0!important;
+  width:100%!important;height:100%!important;
+  min-height:0!important;background:#8b9b9b!important;border:0!important;
+}
+.career-app #workbench3d{display:block;width:100%;height:100%;touch-action:none}
+.career-app .task-header{
+  position:absolute!important;z-index:8;
+  top:calc(57px + var(--safe-t));left:14px;right:auto;
+  width:min(58%,390px);min-height:0;height:auto!important;
+  background:transparent!important;border:0!important;
+  padding:0!important;align-items:flex-start;box-shadow:none!important;
+  pointer-events:none;
+}
+.career-app .task-copy h1{
+  margin:5px 0 0;font-size:clamp(18px,2.5vw,26px);
+  line-height:1.09;letter-spacing:-.55px;white-space:normal;
+  color:#f0f8f0;text-shadow:0 2px 9px #14252c,0 2px 2px #14252c;
+}
+.career-app .mission-meta{
+  display:flex;gap:9px;font-size:9px;line-height:1.4;letter-spacing:1px;
+  color:#d1dcdb;text-shadow:0 1px 4px #111d24;
+}
+.career-app .current-order{color:#ffca88;font-weight:900}
+.career-app #openWorkOrder{
+  position:fixed;right:calc(10px + env(safe-area-inset-right,0px));
+  top:calc(91px + var(--safe-t));z-index:9;
+  width:38px;height:38px;min-width:38px;min-height:38px;
+  border:1px solid #ecf0e646;border-radius:50%;
+  background:#172829a6;color:#f0f3f0;
+  box-shadow:0 2px 6px #0002;pointer-events:auto
+}
+.career-app #openWorkOrder svg{width:18px;height:18px}
+.career-app #openWorkOrder span{display:none}
+.career-app .bottom-nav{
+  position:fixed!important;z-index:9!important;
+  top:calc(51px + var(--safe-t));right:11px;bottom:auto;left:auto;
+  width:auto;max-width:44%;height:36px!important;padding:0!important;
+  border:0!important;background:transparent!important;
+  display:flex;justify-content:flex-end;gap:5px;box-shadow:none!important
+}
+.career-app .bottom-nav button{
+  width:auto;min-width:0;max-width:none;height:36px;min-height:36px;
+  flex:0 0 auto;display:flex;gap:4px;padding:0 5px;
+  background:rgba(11,25,28,.24);border:0;border-bottom:1px solid #f4c58673;
+  border-radius:0;color:#f2f0e8;
+  font-weight:800;font-size:10px;text-shadow:0 1px 4px #192528
+}
+.career-app .bottom-nav button>span:first-child{font-size:17px;color:#f9ca89}
+.career-app .bottom-nav .count{
+  background:none;border:0;color:#f3bf76;font-size:9px;padding:0
+}
+.career-app .nav-separator{display:none}
+.career-app .dimension-card{
+  position:absolute!important;z-index:5;
+  top:calc(126px + var(--safe-t));left:14px;right:auto;
+  padding:0 0 0 8px!important;max-width:min(56%,340px)!important;
+  background:transparent!important;box-shadow:none!important;
+  border:0!important;border-left:2px solid #f9c57b!important;
+  border-radius:0!important;
+  color:#fffdf4;text-shadow:0 1px 8px #14262b;
+  pointer-events:none
+}
+.career-app .dimension-card>span{font-size:8px;color:#efefea;letter-spacing:.7px}
+.career-app .dimension-card>strong{font-size:clamp(16px,2.6vw,25px);line-height:1.1;margin-top:4px}
+.career-app .dimension-card strong small{font-size:10px;color:#ffcb8b}
+.career-app .camera-toggle{
+  position:absolute;z-index:8;right:14px;top:calc(134px + var(--safe-t));
+  width:39px;height:39px;display:grid;place-items:center;
+  border:1px solid #d7e3df65;border-radius:50%;
+  background:#182a2ab0;color:#faf8ec;
+  font-size:24px;font-weight:700;box-shadow:none;
+}
+.career-app .scene-tools{
+  position:absolute!important;z-index:8;
+  top:calc(177px + var(--safe-t));right:13px;
+  display:flex;flex-direction:column;gap:4px;
+}
+.career-app .scene-tools[hidden]{display:none!important}
+.career-app .scene-tools button{
+  width:39px;min-width:39px;height:39px;min-height:39px;
+  border:1px solid #f1f7ea74;border-radius:50%;
+  background:#17282bbb;color:#f5f9f2;
+  box-shadow:0 1px 6px #10212855;font-size:21px
+}
+.career-app .scene-tools button[aria-pressed="true"]{background:#f7c383;color:#203035}
+.career-app .jaw-grip{
+  display:grid!important;place-content:center!important;gap:0!important;
+  width:46px!important;min-width:46px;height:46px!important;min-height:46px!important;
+  padding:0!important;transform:translate(-50%,-50%)!important;
+  border:2px solid #ffe4a8b8!important;border-radius:50%!important;
+  background:radial-gradient(circle at 30% 25%,#f9cd80e6,#e3aa5cb2)!important;
+  color:#1f3336!important;box-shadow:0 0 0 3px #25383b33,0 2px 8px #10242a7d!important;
+  touch-action:none;cursor:grab;z-index:7
+}
+.career-app .jaw-grip:before,.career-app .jaw-grip:after{display:none!important}
+.career-app .jaw-grip #gripSymbol{font-size:20px;font-weight:900;line-height:1}
+.career-app .jaw-grip.dragging{
+  background:#ffcb79!important;scale:1.08;
+  box-shadow:0 0 0 6px #fac37630,0 3px 12px #0008!important;
+}
+.career-app .contact-guide{
+  position:absolute;z-index:6;transform:translateX(-50%);
+  color:#ffe2ae;text-shadow:0 1px 4px #11262b;
+  font-size:9px;font-weight:900;letter-spacing:1.0px;
+  text-align:center;pointer-events:none;white-space:nowrap;
+}
+.career-app .contact-guide:after{
+  content:"";height:11px;width:1px;background:#ffcb82;
+  position:absolute;top:100%;left:50%;
+}
+.career-app .contact-guide-line{display:none}
+.career-app .scene-gesture{
+  position:absolute!important;z-index:3;
+  bottom:clamp(186px,23dvh,224px)!important;
+  left:0;right:0;
+  font-size:9px;letter-spacing:.3px;
+  color:#dce5de;opacity:.76;text-shadow:0 2px 5px #173038;
+  background:none;border:0;pointer-events:none
+}
+.career-app .scene-feedback{
+  position:absolute!important;z-index:5;
+  left:50%!important;right:auto!important;
+  bottom:clamp(207px,25dvh,250px)!important;
+  width:max-content;max-width:calc(100% - 24px);
+  transform:translateX(-50%);margin:0;padding:5px 10px!important;
+  border:0!important;border-radius:50px!important;
+  background:rgba(24,41,42,.70)!important;
+  color:#f4f2e8;text-shadow:0 1px 1px #263d40;
+  box-shadow:none!important;white-space:normal;font-size:10px!important;
+  font-weight:700;line-height:1.3
+}
+.career-app .scene-feedback.good{background:rgba(30,89,62,.76)!important;color:#d9ffe7}
+.career-app .scene-feedback.warning{background:rgba(104,66,37,.83)!important;color:#fff0d1}
+.career-app .scene-feedback.quiet{opacity:.45}
+.career-app .work-controls{
+  position:absolute!important;z-index:10;bottom:0;left:0;right:0;
+  width:100%!important;min-width:0;max-width:none!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(126px,37%);
+  grid-template-rows:auto auto auto!important;align-items:center;gap:6px 8px!important;
+  padding:36px max(12px,env(safe-area-inset-right,0px))
+    calc(10px + var(--safe-b)) max(12px,env(safe-area-inset-left,0px))!important;
+  background:linear-gradient(to bottom,rgba(13,28,30,0),rgba(13,28,30,.78) 20%,rgba(13,27,30,.96) 44%,#102126 95%)!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+  overflow:visible!important;max-height:none!important
+}
+.career-app .feature-strip{
+  grid-column:1/-1;grid-row:1;
+  min-width:0;display:flex;justify-content:space-between;
+  border-bottom:1px solid #acc7bb55;gap:5px;padding-bottom:4px
+}
+.career-app .feature{
+  flex:1 1 0;display:flex;flex-direction:row;align-items:center;justify-content:center;
+  min-width:0;min-height:35px!important;
+  padding:5px 4px!important;gap:5px!important;
+  background:transparent!important;border:0!important;
+  border-radius:0!important;box-shadow:none!important;
+  color:#e6eeea;text-align:left!important;position:relative
+}
+.career-app .feature.is-active{color:#ffcf91}
+.career-app .feature.is-active:after{
+  content:"";position:absolute;bottom:-5px;left:18%;right:18%;height:2px;
+  background:#ffc27a;border-radius:2px
+}
+.career-app .feature-letter{
+  display:grid;place-items:center;
+  width:auto;height:auto;min-width:18px;
+  background:transparent!important;border:0!important;color:#f5c680!important;
+  font:700 15px "DM Sans",sans-serif
+}
+.career-app .feature.is-complete .feature-letter{color:#a8e1b4!important}
+.career-app .feature-copy strong{font-size:11px;font-weight:800;color:inherit}
+.career-app .feature-copy small{font-size:9px;color:#b7c6c3;margin-top:2px}
+.career-app .instrument-row{
+  grid-column:1;grid-row:2;
+  display:grid!important;grid-template-columns:minmax(55px,.95fr) minmax(75px,1fr)!important;
+  gap:6px!important;align-items:center;min-height:53px
+}
+.career-app .tool-picker{
+  height:47px;min-height:47px!important;min-width:0;
+  display:flex;gap:5px;padding:0!important;
+  background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;color:#e9f0eb
+}
+.career-app .tool-icon{color:#eec38a;font-size:21px}
+.career-app .tool-name strong{font-size:10px;letter-spacing:.0px}
+.career-app .tool-name small{display:none}
+.career-app .tool-chevron{font-size:14px;color:#b9ccca}
+.career-app .digital-readout{
+  display:flex!important;align-items:baseline;justify-content:flex-start;
+  gap:3px;padding:4px 0!important;min-width:0;min-height:40px;
+  background:transparent!important;border:0!important;
+  border-radius:0!important;color:#bcf0c6;flex-wrap:wrap
+}
+.career-app .digital-readout #meterReading{
+  font-size:clamp(17px,4vw,26px)!important;line-height:1.1;
+  color:#b8ffc5!important;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:-.75px
+}
+.career-app .digital-readout .unit{font-size:10px;color:#a9e8b6}
+.career-app .digital-readout small{
+  flex-basis:100%;font-size:8px;color:#9eb3aa;text-align:left;
+  line-height:1;letter-spacing:.5px
+}
+.career-app .action-row{
+  grid-column:2;grid-row:2;min-width:0;min-height:47px
+}
+.career-app .main-action{
+  width:100%;min-height:47px!important;max-height:55px;
+  border:0!important;border-radius:11px!important;
+  background:#eab875!important;color:#193037!important;
+  box-shadow:0 2px 0 #96683b!important;
+  padding:8px 6px;font-size:clamp(9px,2.65vw,12px)!important;
+  line-height:1.1;font-weight:900;letter-spacing:.10px!important
+}
+.career-app .main-action:disabled{opacity:.6}
+.career-app .main-action>span{font-size:14px}
+.career-app .instruction{
+  grid-column:1/-1;grid-row:3;margin:0;
+  min-height:14px;font-size:9px!important;
+  text-align:center;color:#b9c9c6;
+  opacity:.82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:0 4px
+}
+.career-app #fineToggle{
+  position:absolute;right:calc(12px + env(safe-area-inset-right,0px));
+  bottom:calc(146px + var(--safe-b));
+  min-width:37px;min-height:37px;width:37px;height:37px;
+  border:1px solid #f4eee565;border-radius:50%;
+  background:#14262ac9;color:#f1f0e4;font-size:20px;
+  display:grid;place-items:center;box-shadow:0 2px 7px #10222655
+}
+.career-app #fineToggle[aria-expanded="true"]{background:#e5b879;color:#233539}
+.career-app .fine-control{
+  position:absolute;z-index:11;
+  right:12px;bottom:calc(192px + var(--safe-b));
+  width:min(365px,calc(100% - 24px));display:flex;flex-direction:column;
+  padding:12px 14px!important;gap:6px;background:#172c2ceb!important;
+  border:1px solid #d9dccf63;border-radius:12px;
+  box-shadow:0 12px 25px #0005
+}
+.career-app .fine-control[hidden]{display:none!important}
+.career-app .fine-header{font-size:11px;color:#e5e9dc}
+.career-app .fine-header output{color:#ffcb8e}
+.career-app .range-row input[type=range]{accent-color:#eab875}
+.career-app .range-row button{
+  min-width:35px;width:35px;height:35px;min-height:35px;
+  border-radius:50%;border:1px solid #a6bbb5;
+  background:#30484b;color:#fff;font-size:19px
+}
+.career-app .sheet,.career-app .sheet-backdrop,.career-app .completion-overlay{z-index:25}
+.career-app .sheet{z-index:26}
+.career-app .completion-overlay{z-index:35}
+/* Keep pointer access to physics objects and whole camera area. */
+.career-app .work-scene>*:not(canvas){pointer-events:none}
+.career-app .work-scene .jaw-grip,
+.career-app .work-scene .camera-toggle,
+.career-app .work-scene .scene-tools,
+.career-app .work-scene .scene-tools button{pointer-events:auto}
+@media (min-width:801px){
+ .career-app .task-header{top:calc(67px + var(--safe-t));left:25px}
+ .career-app .dimension-card{top:calc(158px + var(--safe-t));left:25px}
+ .career-app .bottom-nav{right:20px;top:calc(57px + var(--safe-t))}
+ .career-app #openWorkOrder{right:21px;top:calc(110px + var(--safe-t))}
+ .career-app .camera-toggle{right:21px;top:calc(159px + var(--safe-t))}
+ .career-app .scene-tools{right:20px;top:calc(206px + var(--safe-t))}
+ .career-app .work-controls{
+   left:50%;right:auto;transform:translateX(-50%);
+   width:min(680px,calc(100% - 20px))!important;
+   grid-template-columns:minmax(0,1fr) minmax(175px,34%);
+   border-radius:21px 21px 0 0!important;
+   padding:35px 22px 18px!important;
+   background:linear-gradient(to bottom,transparent,#132426e8 29%,#132426f4 60%,#15282afa)!important;
+ }
+ .career-app #fineToggle{right:calc(12px + max(0px,(100% - 670px)/2));bottom:140px}
+ .career-app .fine-control{right:calc(12px + max(0px,(100% - 670px)/2));bottom:190px}
+ .career-app .scene-feedback{bottom:225px!important}
+ .career-app .scene-gesture{bottom:198px!important}
+}
+@media (max-width:500px){
+ .career-app>.topbar{height:calc(48px + var(--safe-t))!important;padding:var(--safe-t) 11px 0!important}
+ .career-app .brand{gap:6px}
+ .career-app .brand-icon{font-size:26px}
+ .career-app .brand-copy{font-size:12px}
+ .career-app .career-identity .role{font-size:9px}
+ .career-app .career-identity .experience{font-size:10px}
+ .career-app .task-header{
+   top:calc(53px + var(--safe-t));left:12px;
+   width:calc(100% - 174px);padding:0!important
+ }
+ .career-app .task-copy h1{font-size:16px;line-height:1.1;margin-top:4px}
+ .career-app .mission-meta{font-size:8px;gap:5px;letter-spacing:.2px}
+ .career-app .dimension-card{top:calc(115px + var(--safe-t));left:12px;max-width:59%!important}
+ .career-app .dimension-card>strong{font-size:17px}
+ .career-app .dimension-card strong small{font-size:9px}
+ .career-app .bottom-nav{top:calc(51px + var(--safe-t));right:9px;max-width:none}
+ .career-app .bottom-nav button{font-size:9px;padding:0 4px;gap:3px}
+ .career-app .bottom-nav button>span:first-child{font-size:15px}
+ .career-app #openWorkOrder{top:calc(91px + var(--safe-t));right:11px}
+ .career-app .camera-toggle{top:calc(136px + var(--safe-t));right:11px;width:37px;height:37px}
+ .career-app .scene-tools{top:calc(179px + var(--safe-t));right:10px}
+ .career-app .work-controls{
+   grid-template-columns:minmax(0,1fr) minmax(105px,32%);gap:4px 7px!important;
+   padding:38px 10px calc(7px + var(--safe-b))!important
+ }
+ .career-app .feature{min-height:34px!important;gap:3px!important;padding:4px 1px!important}
+ .career-app .feature-letter{font-size:13px;min-width:14px}
+ .career-app .feature-copy strong{font-size:10px}
+ .career-app .feature-copy small{font-size:8px}
+ .career-app .instrument-row{grid-template-columns:minmax(65px,.91fr) minmax(68px,1fr)!important;gap:3px!important}
+ .career-app .tool-icon{font-size:17px}
+ .career-app .tool-name strong{font-size:9px}
+ .career-app .tool-chevron{font-size:12px}
+ .career-app .digital-readout #meterReading{font-size:17px!important}
+ .career-app .digital-readout .unit{font-size:9px}
+ .career-app .digital-readout small{font-size:7px}
+ .career-app .main-action{font-size:9px!important;padding:5px 3px}
+ .career-app #fineToggle{bottom:calc(134px + var(--safe-b));right:10px}
+ .career-app .fine-control{bottom:calc(178px + var(--safe-b));right:10px}
+ .career-app .scene-feedback{bottom:calc(192px + var(--safe-b))!important;font-size:9px!important}
+ .career-app .scene-gesture{bottom:calc(176px + var(--safe-b))!important;font-size:8px}
+}
+@media (max-height:540px) and (orientation:landscape){
+ .career-app .work-controls{
+   left:auto!important;right:0!important;top:45px!important;bottom:0!important;
+   transform:none!important;width:min(290px,41%)!important;
+   grid-template-columns:minmax(0,1fr)!important;
+   grid-template-rows:auto auto auto auto!important;
+   align-content:end;gap:5px!important;
+   padding:25px 10px 10px!important;
+   background:linear-gradient(to right,rgba(11,25,27,.67),#12282beb 30%)!important
+ }
+ .career-app .feature-strip{grid-column:1;grid-row:1}
+ .career-app .instrument-row{grid-column:1;grid-row:2}
+ .career-app .action-row{grid-column:1;grid-row:3}
+ .career-app .instruction{grid-column:1;grid-row:4;white-space:normal}
+ .career-app .task-header{top:49px!important;left:10px!important;width:40%!important}
+ .career-app .dimension-card{top:105px!important;left:10px!important}
+ .career-app .camera-toggle{top:12px!important;right:calc(min(290px,41%) + 9px)!important}
+ .career-app .scene-tools{top:56px!important;right:calc(min(290px,41%) + 9px)!important}
+ .career-app #openWorkOrder{top:5px!important;right:6px!important}
+ .career-app .bottom-nav{top:6px!important;right:45px!important}
+ .career-app #fineToggle{bottom:155px;right:11px}
+ .career-app .fine-control{bottom:198px;right:10px;width:min(290px,41%)}
+ .career-app .scene-feedback{bottom:32px!important;left:27%!important;max-width:52%!important}
+ .career-app .scene-gesture{bottom:12px!important;right:41%!important}
+}

@@ -38,15 +38,17 @@
         <span id="targetDimensionLabel">OVERALL HEIGHT · H</span>
         <strong id="targetDimension">200.00 <small>± 0.50 mm</small></strong>
       </div>
-      <div class="scene-tools" role="group" aria-label="Camera controls">
+      <button type="button" id="cameraToggle" class="camera-toggle" aria-controls="sceneCameraTools" aria-expanded="false" aria-label="Show camera controls" title="Camera controls">⌖</button>
+      <div class="scene-tools" id="sceneCameraTools" role="group" aria-label="Camera controls" hidden>
         <button id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
         <button id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">−</button>
         <button id="panMode" type="button" aria-label="Enable drag-to-pan" aria-pressed="false" title="Drag to pan">✥</button>
         <button id="resetView" type="button" aria-label="Reset camera view" title="Reset view">⟲</button>
       </div>
-      <div id="jawGrip" class="jaw-grip" role="slider" aria-label="Drag the movable measuring jaw" aria-valuemin="0" aria-valuemax="250" aria-valuenow="0" tabindex="0"><span id="gripSymbol">↑</span><small>DRAG</small></div>
-      <div class="scene-feedback" id="sceneCorner">Close the jaws, then set zero.</div>
-      <div class="scene-gesture" id="gestureHint">One finger: rotate · Pinch: zoom · Two fingers: pan</div>
+      <div id="jawGrip" class="jaw-grip" role="slider" aria-label="Slide the highlighted thumb wheel on the caliper" aria-valuemin="0" aria-valuemax="250" aria-valuenow="0" tabindex="0"><span id="gripSymbol">↕</span><small class="sr-only">Slide the tool jaw</small></div>
+      <div class="contact-guide" id="contactGuide" aria-hidden="true"><span class="contact-guide-line"></span><span>SLIDE THE JAW</span></div>
+      <div class="scene-feedback" id="sceneCorner">ZERO YOUR CALIPER TO BEGIN</div>
+      <div class="scene-gesture" id="gestureHint">Drag to orbit · Pinch to zoom</div>
       <div class="scene-error" id="sceneError" hidden>3D is not available on this device. You can still operate the digital measuring controls below.</div>
     </section>
 
@@ -75,7 +77,7 @@
         </div>
       </div>
 
-      <div class="fine-control">
+      <div class="fine-control" id="fineControls" hidden>
         <div class="fine-header"><label for="jawOpening">Jaw adjustment</label><output id="openingValue">0.00 mm</output></div>
         <div class="range-row">
           <button type="button" id="jawMinus" aria-label="Close jaws 0.1 millimetre">−</button>
@@ -84,12 +86,13 @@
         </div>
       </div>
 
+      <button type="button" id="fineToggle" class="fine-toggle" aria-controls="fineControls" aria-expanded="false" aria-label="Show precision jaw adjustment" title="Fine adjustment">⚙</button>
       <div class="action-row">
         <button type="button" class="main-action" id="zeroTool">ZERO CALIPER <span>→</span></button>
         <button type="button" class="main-action" id="seatJaws" hidden>TOUCH OFF PART <span>→</span></button>
         <button type="button" class="main-action" id="transferReading" hidden disabled>RECORD READING <span>✓</span></button>
       </div>
-      <p class="instruction" id="measureStatus" role="status" aria-live="polite">The jaws are closed. Set zero to begin measuring.</p>
+      <p class="instruction" id="measureStatus" role="status" aria-live="polite">Set zero to begin.</p>
       <div hidden class="diagnostic-legacy" aria-hidden="true"><span id="meterZero"></span><span id="caliperStatus"></span><span id="micrometerStatus"></span><span id="guideStep"></span><span id="guideTitle"></span><span id="guideDetail"></span><span id="gripTitle"></span></div>
     </section>
   </main>

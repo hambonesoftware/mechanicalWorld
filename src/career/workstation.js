@@ -101,6 +101,8 @@ function zeroTool() {
     return;
   }
   state.zeroed[state.tool] = true;
+  state.firstInteraction=true;
+  $("contactGuide").hidden=true;
   state.opening = 0;
   state.reading = null;
   renderControlState();
@@ -173,6 +175,8 @@ function renderControlState() {
   $("transferReading").disabled = state.reading === null;
   $("transferReading").innerHTML = "RECORD " + (state.reading === null ? "READING" : state.reading.toFixed(2) + " mm") + " <span>✓</span>";
   $("zeroTool").textContent = "ZERO " + (state.tool === "caliper" ? "CALIPER" : "MICROMETER") + " →";
+  $("contactGuide").hidden = state.reading!==null || state.firstInteraction;
+  $("sceneCorner").classList.toggle("quiet",state.reading===null && calibrated);
   $("reportCount").textContent = state.captured.size + "/3";
   for (const button of $$("[data-feature]")) {
     const active = button.dataset.feature === feature.id;
@@ -234,16 +238,16 @@ function createWorkshop(canvas) {
   renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xb2bec6);
-  scene.fog = new THREE.Fog(0xb2bec6, 10, 26);
+  scene.background = new THREE.Color(0x899b9d);
+  scene.fog = new THREE.Fog(0x899b9d, 12, 28);
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 40);
   const target = new THREE.Vector3(0, 1.85, 0.20);
-  const startOffset = new THREE.Vector3(2.35, 1.40, 5.1);
+  const startOffset = new THREE.Vector3(1.95, 1.05, 4.90);
   const spherical = new THREE.Spherical().setFromVector3(startOffset);
   let panMode = false;
   const pointers = new Map();
@@ -277,8 +281,8 @@ function createWorkshop(canvas) {
     updateCamera();
   }
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x627887, 2.3));
-  const key = new THREE.DirectionalLight(0xfff3e4, 3.1);
+  scene.add(new THREE.HemisphereLight(0xe4f1ff, 0x516572, 2.25));
+  const key = new THREE.DirectionalLight(0xffecd2, 3.0);
   key.position.set(-4, 7, 6);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -288,7 +292,7 @@ function createWorkshop(canvas) {
   key.shadow.camera.bottom = -4;
   key.shadow.normalBias = 0.025;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xc7e6f9, 1.3);
+  const fill = new THREE.DirectionalLight(0xb5deef, 1.8);
   fill.position.set(4, 4, -4);
   scene.add(fill);
   const mats = {
@@ -297,8 +301,8 @@ function createWorkshop(canvas) {
     machine: new THREE.MeshStandardMaterial({color:0x344957,roughness:0.59,metalness:0.31}),
     rubber: new THREE.MeshStandardMaterial({color:0x182730,roughness:0.90}),
     amber: new THREE.MeshStandardMaterial({color:0xf6a951,roughness:0.40,metalness:0.20}),
-    bench: new THREE.MeshStandardMaterial({color:0x5b7079,roughness:0.91}),
-    wall: new THREE.MeshStandardMaterial({color:0xb5c2c9,roughness:0.97}),
+    bench: new THREE.MeshStandardMaterial({color:0x5c6b68,roughness:0.88}),
+    wall: new THREE.MeshStandardMaterial({color:0x84999e,roughness:0.96}),
     selected: new THREE.MeshStandardMaterial({color:0xffc17c,roughness:0.39,metalness:0.25,emissive:0x75450d,emissiveIntensity:0.12})
   };
   function box(parent,w,h,d,x,y,z,material) {
@@ -316,6 +320,69 @@ function createWorkshop(canvas) {
   box(scene,6.8,0.19,4.5,0,0.67,0,mats.bench);
   box(scene,6.8,0.10,4.5,0,0.53,0,mats.machine);
   box(scene,9,5.6,0.15,0,2.75,-3.25,mats.wall);
+  // Engineering lab around the part. All decorative props sit behind the
+  // workpiece, leaving the scene camera and jaws accessible on a phone.
+  const floorMaterial=new THREE.MeshStandardMaterial({color:0x697977,roughness:0.93});
+  const wallTrim=new THREE.MeshStandardMaterial({color:0x354951,roughness:0.56,metalness:0.52});
+  const cabinetPaint=new THREE.MeshStandardMaterial({color:0x60766d,roughness:0.57,metalness:0.26});
+  const paper=new THREE.MeshStandardMaterial({color:0xf2ede2,roughness:0.98});
+  const safetyYellow=new THREE.MeshStandardMaterial({color:0xe7b155,roughness:0.56});
+  box(scene,15,0.15,15,0,-0.03,0,floorMaterial);
+  for(const x of [-4.2,4.2])box(scene,0.12,5.4,0.14,x,2.65,-3.08,wallTrim);
+  for(let x=-3.7;x<3.9;x+=1.23){
+    box(scene,0.018,0.018,3.8,x,-0.08,-0.7,wallTrim);
+  }
+  // Pegboard, instrument hooks and a spare micrometer at the wall.
+  box(scene,4.7,1.67,0.12,0.15,3.37,-3.05,cabinetPaint);
+  const pegHole=new THREE.MeshStandardMaterial({color:0x31484a,roughness:0.8});
+  for(let x=-2.05;x<2.4;x+=0.25){
+    for(let y=2.68;y<4.1;y+=0.26){
+      box(scene,0.030,0.030,0.006,x,y,-2.98,pegHole);
+    }
+  }
+  box(scene,0.10,0.9,0.14,-1.7,3.34,-2.82,mats.polished);
+  box(scene,0.45,0.10,0.14,-1.7,3.73,-2.81,mats.machine);
+  box(scene,0.45,0.12,0.14,-1.7,2.90,-2.81,mats.machine);
+  box(scene,0.20,0.60,0.12,1.7,3.31,-2.80,mats.amber);
+  box(scene,0.52,0.10,0.12,1.7,3.02,-2.80,mats.polished);
+  // The translucent window helps convey a larger department beyond the bench.
+  const windowMetal=wallTrim;
+  const glass=new THREE.MeshStandardMaterial({color:0xb6d5db,roughness:0.16,metalness:0.05,transparent:true,opacity:0.59});
+  box(scene,1.20,1.90,0.08,3.36,3.17,-3.00,windowMetal);
+  box(scene,1.04,1.72,0.08,3.36,3.17,-2.93,glass);
+  box(scene,0.055,1.72,0.12,3.36,3.17,-2.86,wallTrim);
+  // Industrial drawers and tool storage behind the working area.
+  box(scene,1.13,1.18,0.79,3.35,0.62,-2.35,cabinetPaint);
+  for(const y of [0.33,0.69,1.03]){
+    box(scene,1.01,0.045,0.035,3.35,y,-1.93,wallTrim);
+    box(scene,0.20,0.045,0.04,3.35,y+0.095,-1.9,mats.polished);
+  }
+  const workLamp=new THREE.Group();
+  workLamp.position.set(2.55,0.82,-0.82);
+  scene.add(workLamp);
+  box(workLamp,0.45,0.10,0.33,0,0,0,mats.machine);
+  box(workLamp,0.05,0.95,0.05,-0.10,0.53,0,mats.polished);
+  const lampArm=box(workLamp,0.045,0.85,0.045,-0.39,1.27,0,mats.polished);
+  lampArm.rotation.z=-0.65;
+  box(workLamp,0.55,0.18,0.37,-0.65,1.70,0,mats.machine);
+  const glow=new THREE.MeshStandardMaterial({color:0xffedc5,emissive:0xffd89c,emissiveIntensity:0.63,roughness:0.78});
+  box(workLamp,0.49,0.025,0.30,-0.65,1.60,0,glow);
+  // A physical engineering print and pencil resting on the table.
+  const print=box(scene,1.07,0.013,0.72,1.72,0.81,1.12,paper);
+  print.rotation.y=-0.17;
+  for(const z of [0.91,1.04,1.16]){
+    box(scene,0.68,0.004,0.008,1.72,0.826,z,wallTrim);
+  }
+  const pencil=box(scene,0.035,0.035,0.74,1.05,0.84,1.15,safetyYellow);
+  pencil.rotation.y=0.19;
+  // Steel inspection gauge blocks next to the print.
+  box(scene,0.28,0.14,0.34,-2.30,0.87,1.00,mats.polished);
+  box(scene,0.25,0.31,0.24,-2.70,0.95,1.06,mats.steel);
+  // Overhead fixtures wash the metal while preserving directional shadows.
+  box(scene,2.1,0.12,0.38,-1.5,5.12,-1.35,wallTrim,false);
+  box(scene,1.93,0.018,0.29,-1.5,5.04,-1.35,glow,false);
+  box(scene,1.75,0.12,0.38,2.15,5.10,-1.38,wallTrim,false);
+  box(scene,1.59,0.018,0.29,2.15,5.01,-1.38,glow,false);
   const grid = new THREE.GridHelper(12,20,0x8ea2a8,0xa9bac1);
   grid.position.y=0.79;
   grid.material.opacity=0.26; grid.material.transparent=true;
@@ -355,8 +422,20 @@ function createWorkshop(canvas) {
   box(caliper,0.36,0.25,0.26,-0.28,0,0,mats.machine);
   const caliperSlider = new THREE.Group();
   box(caliperSlider,0.67,0.11,0.23,0.12,0,0,mats.polished);
-  box(caliperSlider,0.37,0.28,0.30,-0.27,0,0,mats.amber);
+  box(caliperSlider,0.37,0.28,0.30,-0.27,0,0,mats.machine);
   box(caliperSlider,0.28,0.15,0.035,-0.27,0,0.17,mats.rubber);
+  // Knurled thumbwheel and edge-etched ruler marks make the instrument
+  // read as a physical tool, not a generic orange UI rectangle.
+  const thumb=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.09,20),mats.amber);
+  thumb.rotation.z=Math.PI/2;
+  thumb.position.set(-0.50,0.09,0.12);
+  thumb.castShadow=true;
+  caliperSlider.add(thumb);
+  for(let i=0;i<=35;i++){
+    const y=0.12+i*0.065;
+    box(caliper, i%5===0?0.065:0.034,0.011,0.009,-0.16,y,0.079,
+      i%5===0?mats.machine:mats.steel);
+  }
   caliper.add(caliperSlider);
   scene.add(caliper);
 
@@ -457,16 +536,18 @@ function createWorkshop(canvas) {
     const group=state.tool==="caliper"?caliperSlider:micSlider;
     group.updateWorldMatrix(true,false);
     const marker=state.tool==="caliper"
-      ?new THREE.Vector3(-0.26,0.03,0.25)
+      ?new THREE.Vector3(-0.49,0.08,0.22)
       :new THREE.Vector3(0.26,0.04,0.28);
     const point=group.localToWorld(marker).project(camera);
     const width=canvas.clientWidth,height=canvas.clientHeight;
     if(!Number.isFinite(point.x)||!Number.isFinite(point.y)) return;
-    const x=THREE.MathUtils.clamp((point.x+1)*width/2,37,width-53);
-    const y=THREE.MathUtils.clamp((1-point.y)*height/2,70,height-49);
+    const x=THREE.MathUtils.clamp((point.x+1)*width/2,27,width-27);
+    const y=THREE.MathUtils.clamp((1-point.y)*height/2,120,height-130);
     const grip=$("jawGrip");
     grip.style.left=x+"px";
     grip.style.top=y+"px";
+    $("contactGuide").style.left=x+"px";
+    $("contactGuide").style.top=(y-43)+"px";
   }
 
   // Tap the part to select its feature; all 3 features are also available
@@ -539,6 +620,7 @@ function createWorkshop(canvas) {
     gripPointer={id:event.pointerId,x:event.clientX,y:event.clientY,opening:state.opening,moved:false};
     try{grip.setPointerCapture(event.pointerId);}catch{/* synthetic pointer */}
     grip.classList.add("dragging");
+    $("contactGuide").hidden=true;
     if(!state.zeroed[state.tool])feedback("Close jaws and zero the tool first, then slide to the part.","warning");
   });
   grip.addEventListener("pointermove",event=>{
@@ -636,6 +718,18 @@ function connectControls(){
     button.addEventListener("click",()=>selectFeature(button.dataset.feature));
   }
   $("toolPicker").addEventListener("click",switchTool);
+  $("cameraToggle").addEventListener("click",()=>{
+    const open=$("sceneCameraTools").hidden;
+    $("sceneCameraTools").hidden=!open;
+    $("cameraToggle").setAttribute("aria-expanded",String(open));
+    $("cameraToggle").setAttribute("aria-label",open?"Hide camera controls":"Show camera controls");
+  });
+  $("fineToggle").addEventListener("click",()=>{
+    const open=$("fineControls").hidden;
+    $("fineControls").hidden=!open;
+    $("fineToggle").setAttribute("aria-expanded",String(open));
+    $("fineToggle").setAttribute("aria-label",open?"Hide precision jaw adjustment":"Show precision jaw adjustment");
+  });
   $("zeroTool").addEventListener("click",zeroTool);
   $("seatJaws").addEventListener("click",seatJaws);
   $("transferReading").addEventListener("click",recordReading);

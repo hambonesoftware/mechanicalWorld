@@ -54,12 +54,22 @@ test("mobile play area and single primary action remain visible without document
   const scene=await page.locator("#sceneWrap").boundingBox();
   const controls=await page.locator(".work-controls").boundingBox();
   const dock=await page.locator(".bottom-nav").boundingBox();
-  expect(scene.width).toBeGreaterThan(0);
-  expect(scene.height).toBeGreaterThan(info.project.name==="mobile-landscape"?155:160);
+  expect(scene.width).toBeGreaterThan(viewport.width*0.95);
+  expect(scene.height).toBeGreaterThan(viewport.height*0.95);
   expect(controls.width).toBeGreaterThan(0);
-  expect(dock.y+dock.height).toBeLessThanOrEqual(viewport.height+2);
+  expect(controls.height).toBeLessThan(viewport.height*0.52);
+  expect(dock.y+dock.height).toBeLessThanOrEqual(viewport.height);
+  await expect(page.locator("#fineControls")).toBeHidden();
+  await expect(page.locator("#sceneCameraTools")).toBeHidden();
+  await page.locator("#cameraToggle").click();
   await expect(page.locator("#zoomIn")).toBeVisible();
   await expect(page.locator("#zoomOut")).toBeVisible();
+  await page.locator("#cameraToggle").click();
+  await expect(page.locator("#sceneCameraTools")).toBeHidden();
+  await page.locator("#fineToggle").click();
+  await expect(page.locator("#fineControls")).toBeVisible();
+  await page.locator("#fineToggle").click();
+  await expect(page.locator("#fineControls")).toBeHidden();
   await expect(page.locator("#openDrawing")).toBeVisible();
   await expect(page.locator("#openReport")).toBeVisible();
   const visibleActions=await page.locator(".action-row button:visible").count();
@@ -76,6 +86,7 @@ test("direct caliper dragging produces a real recorded height reading",async({pa
   const errors=await openWorkstation(page);
   const canvas=page.locator("#workbench3d");
   const start=await page.evaluate(()=>window.redlineCareerDebug());
+  await page.locator("#cameraToggle").click();
   await page.locator("#zoomIn").click();
   const zoomed=await page.evaluate(()=>window.redlineCareerDebug());
   expect(zoomed.radius).toBeLessThan(start.radius);
@@ -95,6 +106,7 @@ test("direct caliper dragging produces a real recorded height reading",async({pa
   const reset=await page.evaluate(()=>window.redlineCareerDebug());
   expect(reset.target).toEqual(start.target);
   await page.locator("#panMode").click();
+  await page.locator("#cameraToggle").click();
 
   await page.locator("#zeroTool").click();
   await expect(page.locator("#zeroTool")).toBeHidden();
@@ -160,18 +172,19 @@ test("career work order teaches instruments, checks tolerance and awards XP",asy
   await expect(page.locator("#resultDetail")).toContainText("WO-002");
 });
 
-test("tablet and landscape layouts avoid a three-column page",async({page},info)=>{
+test("tablet and landscape layouts keep the lab fullscreen and the controls contextual",async({page},info)=>{
   test.skip(!["mobile-landscape","tablet"].includes(info.project.name),"Wide viewport checks");
   const errors=await openWorkstation(page);
   const viewport=page.viewportSize();
   const scene=await page.locator("#sceneWrap").boundingBox();
   const controls=await page.locator(".work-controls").boundingBox();
-  if(info.project.name==="mobile-landscape"){
-    expect(scene.width).toBeGreaterThan(viewport.width*0.47);
-    expect(controls.x).toBeGreaterThan(scene.x+scene.width-2);
-  }else{
-    expect(scene.height).toBeGreaterThan(250);
-    expect(scene.width).toBeGreaterThan(viewport.width*0.8);
-  }
+  expect(scene.width).toBeGreaterThan(viewport.width*0.95);
+  expect(scene.height).toBeGreaterThan(viewport.height*0.95);
+  expect(controls.width).toBeLessThan(viewport.width+2);
+  await expect(page.locator("#cameraToggle")).toBeVisible();
+  await expect(page.locator("#fineControls")).toBeHidden();
+  const grip=await page.locator("#jawGrip").boundingBox();
+  expect(grip.width).toBeLessThanOrEqual(50);
+  expect(grip.height).toBeLessThanOrEqual(50);
   expect(errors).toEqual([]);
 });
