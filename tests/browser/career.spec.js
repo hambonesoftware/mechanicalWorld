@@ -125,10 +125,12 @@ test("direct caliper dragging produces a real recorded height reading",async({pa
   const grabRect=await grab.boundingBox();
   const bx=grabRect.x+grabRect.width/2;
   const by=grabRect.y+grabRect.height/2;
-  const placeDistance=Math.max(125,Math.min(230,rect.width*0.64))*0.79;
+  const scenePose=await page.evaluate(()=>window.redlineCareerDebug());
+  const moveX=(scenePose.targetScreen.x-scenePose.toolOriginScreen.x)*0.79;
+  const moveY=(scenePose.targetScreen.y-scenePose.toolOriginScreen.y)*0.79;
   await grab.dispatchEvent("pointerdown",{pointerId:37,pointerType:"touch",clientX:bx,clientY:by});
-  await grab.dispatchEvent("pointermove",{pointerId:37,pointerType:"touch",clientX:bx-placeDistance,clientY:by});
-  await grab.dispatchEvent("pointerup",{pointerId:37,pointerType:"touch",clientX:bx-placeDistance,clientY:by});
+  await grab.dispatchEvent("pointermove",{pointerId:37,pointerType:"touch",clientX:bx+moveX,clientY:by+moveY});
+  await grab.dispatchEvent("pointerup",{pointerId:37,pointerType:"touch",clientX:bx+moveX,clientY:by+moveY});
   await expect(page.locator("#jawGrip")).toBeVisible();
   await expect(page.locator("#alignTool")).toBeHidden();
   // The in-world help stays visible after zeroing, until the first real

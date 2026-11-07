@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { loadCaliperRig } from "./caliper-model.js";
 import {
   FEATURES, canSeat, assessInspection, readCareer, careerRank, completeWorkOrder
 } from "./inspection.js";
@@ -21,7 +22,8 @@ const state = {
   mode: readToolMode(store),
   held: false,
   positioned: false,
-  placement: 0
+  placement: 0,
+  toolDistance: Infinity
 };
 
 const dimensionLabels = {
@@ -86,10 +88,11 @@ function pickUpTool() {
   state.held = true;
   state.positioned = false;
   state.placement = 0;
+  state.toolDistance = Infinity;
   state.scene?.setPlacement(0.10);
   if (TOOL_MODES[state.mode].closeup) state.scene?.focusTool();
   renderControlState();
-  feedback("Tool in hand. Set zero, then drag the GRAB point toward the beam.", "good");
+  feedback("Tool in hand. Set zero, then drag the instrument toward the workpiece.", "good");
 }
 function positionTool(announce = true) {
   if (!state.held) pickUpTool();
@@ -98,6 +101,7 @@ function positionTool(announce = true) {
     return false;
   }
   state.placement = 1;
+  state.toolDistance = 0;
   state.positioned = true;
   state.scene?.setPlacement(1);
   if (TOOL_MODES[state.mode].closeup) state.scene?.focusTool();
@@ -115,8 +119,9 @@ function updatePlacement(progress) {
 }
 function finishPlacement() {
   if (!state.held || state.positioned) return;
+  const snapRadius = state.mode === "free" ? 0.23 : state.mode === "closeup" ? 0.53 : 0.75;
   const result = placementResult(state.mode, state.placement);
-  if (result.positioned) {
+  if (state.toolDistance <= snapRadius || (!Number.isFinite(state.toolDistance) && result.positioned)) {
     positionTool();
   } else {
     feedback(state.mode === "free"
@@ -130,6 +135,7 @@ function selectMode(mode) {
   state.held = false;
   state.positioned = false;
   state.placement = 0;
+  state.toolDistance = Infinity;
   state.opening = 0;
   state.reading = null;
   state.scene?.resetView();
@@ -159,6 +165,7 @@ function selectFeature(id) {
   state.held = false;
   state.positioned = false;
   state.placement = 0;
+  state.toolDistance = Infinity;
   state.opening = 0;
   state.reading = null;
   renderControlState();
@@ -174,6 +181,7 @@ function switchTool() {
   state.held = false;
   state.positioned = false;
   state.placement = 0;
+  state.toolDistance = Infinity;
   state.opening = 0;
   state.reading = null;
   state.scene?.setTool(state.tool);
@@ -199,7 +207,7 @@ function zeroTool() {
   state.opening = 0;
   state.reading = null;
   renderControlState();
-  feedback("Zero set. Drag the GRAB point to bring the caliper onto the part.", "good");
+  feedback("Zero set. Drag the instrument toward the glowing measurement target.", "good");
 }
 
 function seatJaws() {
@@ -280,7 +288,7 @@ function renderControlState() {
     ? "Drag the tool body toward the beam to align the jaws"
     : "Grab the " + state.tool + " from the bench");
   $("toolGrab").querySelector(".tool-grab-caption").textContent = state.held ? "MOVE" : "GRAB";
-  $("toolSnapGuide").hidden = !state.held || state.positioned || state.placement < 0.28;
+  $("toolSnapGuide").hidden = !state.held || !calibrated || state.positioned || !ready;
   $("transferReading").disabled = state.reading === null;
   $("transferReading").innerHTML = "RECORD " + (state.reading === null ? "READING" : state.reading.toFixed(2) + " mm") + " <span>✓</span>";
   $("zeroTool").textContent = "ZERO " + (state.tool === "caliper" ? "CALIPER" : "MICROMETER") + " →";
@@ -547,6 +555,23 @@ function createWorkshop(canvas) {
   }
   caliper.add(caliperSlider);
   scene.add(caliper);
+  const placeholderParts = [...caliper.children];
+  let caliperRig = null;
+  let assetLoadError = null;
+  // Import the complete original CC0 model, replacing the placeholder only
+  // after all geometry and PBR materials have loaded. Keep fallback playable.
+  loadCaliperRig().then(rig => {
+    if (disposed) return;
+    caliperRig = rig;
+    caliper.add(rig.root);
+    for (const placeholder of placeholderParts) placeholder.visible = false;
+    setOpeningVisual(state.opening);
+    renderNeeded = true;
+    updateGrip();
+  }).catch(error => {
+    assetLoadError = String(error);
+    console.warn("REDLINE: CC0 vernier caliper failed to load; retaining functional fallback", error);
+  });
 
   // Outside micrometer occupies a close-up working position at web height.
   const micro = new THREE.Group();
@@ -634,6 +659,43 @@ function createWorkshop(canvas) {
     updateGrip();
   }
 
+  // Direct manipulation in a camera-facing work plane. Touch motion in both
+  // directions moves the instrument rather than changing a hidden slider.
+  function pointerOnToolPlane(clientX,clientY) {
+    const rect=canvas.getBoundingClientRect();
+    const x=((clientX-rect.left)/rect.width)*2-1;
+    const y=1-((clientY-rect.top)/rect.height)*2;
+    const ray=new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(x,y),camera);
+    const z=toolPose(state.tool,state.feature.id).park.z;
+    return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,0,1),-z),new THREE.Vector3());
+  }
+  function beginToolDrag(x,y) {
+    const hit=pointerOnToolPlane(x,y);
+    if(!hit)return null;
+    const object=state.tool==="caliper"?caliper:micro;
+    return {initialPointer:hit.toArray(),initialPosition:object.position.toArray()};
+  }
+  function dragTool(x,y,start) {
+    if(!start)return null;
+    const hit=pointerOnToolPlane(x,y);
+    if(!hit)return null;
+    const pose=toolPose(state.tool,state.feature.id);
+    const object=state.tool==="caliper"?caliper:micro;
+    const origin=new THREE.Vector3().fromArray(start.initialPosition);
+    const finger=new THREE.Vector3().fromArray(start.initialPointer);
+    const xWorld=THREE.MathUtils.clamp(origin.x+hit.x-finger.x,-2.4,2.4);
+    const yWorld=THREE.MathUtils.clamp(origin.y+hit.y-finger.y,0.82,3.70);
+    const distance=Math.hypot(xWorld-pose.engaged.x,yWorld-pose.engaged.y);
+    const initialDistance=Math.hypot(pose.park.x-pose.engaged.x,pose.park.y-pose.engaged.y);
+    const progress=THREE.MathUtils.clamp(1-distance/Math.max(0.1,initialDistance),0,1);
+    const rotationProgress=THREE.MathUtils.smoothstep(progress,0.1,0.88);
+    object.position.set(xWorld,yWorld,THREE.MathUtils.lerp(pose.park.z,pose.engaged.z,rotationProgress));
+    object.rotation.z=THREE.MathUtils.lerp(pose.parkedRotation,pose.engagedRotation,rotationProgress);
+    renderNeeded=true;
+    updateGrip();
+    return {distance,progress};
+  }
   function setFeature(id) {
     caliper.visible = state.tool === "caliper";
     micro.visible = state.tool === "micrometer";
@@ -656,6 +718,7 @@ function createWorkshop(canvas) {
       const ratio = mm / Math.max(1, state.feature.nominal);
       const travel = state.feature.id === "height" ? 1.96 : 1.72;
       caliperSlider.position.y = Math.min(2.3, Math.max(0, ratio * travel));
+      caliperRig?.setOpening(mm, state.feature.nominal, travel);
     } else {
       micSlider.position.x = Math.min(0.4, Math.max(0, mm / Math.max(1, state.feature.nominal) * 0.28));
     }
@@ -675,9 +738,18 @@ function createWorkshop(canvas) {
       };
     };
     const sliderGroup = state.tool === "caliper" ? caliperSlider : micSlider;
-    const sliderPoint = coordinate(sliderGroup, state.tool === "caliper"
-      ? new THREE.Vector3(-0.49, 0.08, 0.22)
-      : new THREE.Vector3(0.26, 0.04, 0.28));
+    const projectWorld = point => {
+      const clip = point.project(camera);
+      return {
+        x: THREE.MathUtils.clamp((clip.x + 1) * width / 2, 28, width - 28),
+        y: THREE.MathUtils.clamp((1 - clip.y) * height / 2, 146, height - 160)
+      };
+    };
+    const sliderPoint = caliperRig && state.tool === "caliper"
+      ? projectWorld(caliperRig.thumb.getWorldPosition(new THREE.Vector3()))
+      : coordinate(sliderGroup, state.tool === "caliper"
+        ? new THREE.Vector3(-0.49, 0.08, 0.22)
+        : new THREE.Vector3(0.26, 0.04, 0.28));
     const grip = $("jawGrip");
     grip.style.left = sliderPoint.x + "px";
     grip.style.top = sliderPoint.y + "px";
@@ -687,13 +759,18 @@ function createWorkshop(canvas) {
     // 44+ CSS-pixel grab target follows the *instrument body*, not the
     // moving jaw. The tool itself is also raycastable on the canvas.
     const toolGroup = state.tool === "caliper" ? caliper : micro;
-    const grabPoint = coordinate(toolGroup, state.tool === "caliper"
-      ? new THREE.Vector3(-0.26, 1.07, 0.19)
-      : new THREE.Vector3(0.40, 0, 0.25));
+    const grabPoint = caliperRig && state.tool === "caliper"
+      ? projectWorld(caliperRig.bodyAnchor.getWorldPosition(new THREE.Vector3()))
+      : coordinate(toolGroup, state.tool === "caliper"
+        ? new THREE.Vector3(-0.26, 1.07, 0.19)
+        : new THREE.Vector3(0.40, 0, 0.25));
     $("toolGrab").style.left = grabPoint.x + "px";
     $("toolGrab").style.top = grabPoint.y + "px";
-    $("toolSnapGuide").style.left = THREE.MathUtils.clamp(grabPoint.x, 70, width - 70) + "px";
-    $("toolSnapGuide").style.top = (grabPoint.y - 49) + "px";
+    const targetSpot = toolPose(state.tool, state.feature.id).engaged.clone();
+    targetSpot.y += state.feature.id === "flange" ? -0.25 : 0.65;
+    const targetScreen = projectWorld(targetSpot);
+    $("toolSnapGuide").style.left = targetScreen.x + "px";
+    $("toolSnapGuide").style.top = targetScreen.y + "px";
   }
 
   function focusTool() {
@@ -737,27 +814,31 @@ function createWorkshop(canvas) {
     if (state.positioned) return false;
     if (!state.held) pickUpTool();
     toolPointer = {
-      id: event.pointerId, startX: event.clientX,
-      progress: state.placement, source, moved: false
+      id:event.pointerId,startX:event.clientX,startY:event.clientY,
+      source,moved:false,grab:state.scene?.beginToolDrag(event.clientX,event.clientY)
     };
-    if (source === "handle") $("toolGrab").classList.add("dragging");
+    if (source==="handle") $("toolGrab").classList.add("dragging");
     return true;
   }
   function moveToolDrag(event) {
-    if (!toolPointer || toolPointer.id !== event.pointerId) return false;
+    if (!toolPointer || toolPointer.id!==event.pointerId) return false;
     event.preventDefault();
-    const dx = toolPointer.startX - event.clientX;
-    if (Math.abs(dx) > 4) toolPointer.moved = true;
-    if (state.zeroed[state.tool] && state.tool === state.feature.tool) {
-      const span = Math.max(125, Math.min(230, canvas.clientWidth * 0.64));
-      updatePlacement(travelFromDrag(toolPointer.progress, dx, span));
+    const dx=event.clientX-toolPointer.startX,dy=event.clientY-toolPointer.startY;
+    if (Math.hypot(dx,dy)>4)toolPointer.moved=true;
+    if (state.zeroed[state.tool] && state.tool===state.feature.tool) {
+      const result=state.scene?.dragTool(event.clientX,event.clientY,toolPointer.grab);
+      if (result) {
+        state.placement=result.progress;
+        state.toolDistance=result.distance;
+        $("toolSnapGuide").hidden=false;
+      }
     }
     return true;
   }
   function endToolDrag(event) {
-    if (!toolPointer || toolPointer.id !== event.pointerId) return false;
-    const moved = toolPointer.moved;
-    toolPointer = null;
+    if (!toolPointer || toolPointer.id!==event.pointerId) return false;
+    const moved=toolPointer.moved;
+    toolPointer=null;
     $("toolGrab").classList.remove("dragging");
     if (moved && state.zeroed[state.tool]) finishPlacement();
     return true;
@@ -899,7 +980,7 @@ function createWorkshop(canvas) {
     renderer.dispose();
   },{once:true});
   return{
-    resize,setFeature,setTool,setOpening:setOpeningVisual,setPlacement,focusTool,
+    resize,setFeature,setTool,setOpening:setOpeningVisual,setPlacement,focusTool,beginToolDrag,dragTool,
     zoom(factor){spherical.radius*=factor;updateCamera();},
     resetView,updateGrip,
     setPan(enabled){panMode=enabled;},
@@ -908,7 +989,21 @@ function createWorkshop(canvas) {
       target:target.toArray(),opening:state.opening,panMode,
       feature:state.feature.id,tool:state.tool,
       held:state.held,positioned:state.positioned,placement:state.placement,mode:state.mode,
-      toolPosition:(state.tool==="caliper"?caliper:micro).position.toArray()
+      toolPosition:(state.tool==="caliper"?caliper:micro).position.toArray(),
+      caliperAssetLoaded:!!caliperRig, assetLoadError,
+      modelNodes:caliperRig ? ["Caliper beam",...["Outside measuring jaw.001","Inside measuring point.001","Sliding scale block","Slider thumb wheel"]] : [],
+      targetPosition:toolPose(state.tool,state.feature.id).engaged.toArray(),
+      placementDistance:state.toolDistance,
+      targetScreen:(() => {
+        const pose=toolPose(state.tool,state.feature.id);
+        const point=new THREE.Vector3(pose.engaged.x,pose.engaged.y,pose.park.z).project(camera);
+        return {x:(point.x+1)*canvas.clientWidth/2,y:(1-point.y)*canvas.clientHeight/2};
+      })(),
+      toolOriginScreen:(() => {
+        const object=state.tool==="caliper"?caliper:micro;
+        const point=object.position.clone().project(camera);
+        return {x:(point.x+1)*canvas.clientWidth/2,y:(1-point.y)*canvas.clientHeight/2};
+      })()
     };}
   };
 }

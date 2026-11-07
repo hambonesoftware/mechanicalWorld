@@ -19,17 +19,26 @@ async function choose(page, mode) {
 async function dragBody(page, fraction, pointerId = 60) {
   const grip = page.locator("#toolGrab");
   const rect = await grip.boundingBox();
-  const canvas = await page.locator("#workbench3d").boundingBox();
-  const travel = Math.max(125,Math.min(230,canvas.width*0.64))*fraction;
+  const scene = await page.evaluate(() => window.redlineCareerDebug());
+  // Grab the actual instrument and drag toward the projected workpiece
+  // contact location. Both X and Y matter; there is no fixed swipe direction.
+  const dx = (scene.targetScreen.x - scene.toolOriginScreen.x) * fraction;
+  const dy = (scene.targetScreen.y - scene.toolOriginScreen.y) * fraction;
   const x = rect.x + rect.width/2, y = rect.y + rect.height/2;
   await grip.dispatchEvent("pointerdown",{pointerId,pointerType:"touch",clientX:x,clientY:y});
-  await grip.dispatchEvent("pointermove",{pointerId,pointerType:"touch",clientX:x-travel,clientY:y});
-  await grip.dispatchEvent("pointerup",{pointerId,pointerType:"touch",clientX:x-travel,clientY:y});
+  await grip.dispatchEvent("pointermove",{pointerId,pointerType:"touch",clientX:x+dx,clientY:y+dy});
+  await grip.dispatchEvent("pointerup",{pointerId,pointerType:"touch",clientX:x+dx,clientY:y+dy});
 }
 
 test("assisted mode is the default and magnetically aligns the real 3D instrument",async({page},info)=>{
   test.skip(info.project.name!=="iphone-portrait","Phone touch control acceptance");
   const errors = await enterLab(page);
+  await expect.poll(async() => (await page.evaluate(()=>window.redlineCareerDebug())).caliperAssetLoaded,
+    {timeout:15000}).toBe(true);
+  const model = await page.evaluate(()=>window.redlineCareerDebug());
+  expect(model.assetLoadError).toBeNull();
+  expect(model.modelNodes).toContain("Sliding scale block");
+  expect(model.modelNodes).toContain("Slider thumb wheel");
   await expect(page.locator("#handlingModeLabel")).toHaveText("B");
   await expect(page.locator("#jawGrip")).toBeHidden();
   const sceneBounds=await page.locator("#workbench3d").boundingBox();

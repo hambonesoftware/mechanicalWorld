@@ -678,3 +678,23 @@ button:disabled{cursor:not-allowed;opacity:.45}
   .career-app .bottom-nav{max-width:54%!important}
   .career-app .bottom-nav button{font-size:8px;padding:0 2px}
 }
+
+/* The destination is an in-world reticle, not a floating instruction card. */
+.career-app #toolSnapGuide{
+  width:34px!important;height:34px!important;
+  min-width:34px;min-height:34px;
+  border:0!important;box-shadow:none!important;
+  border-radius:50%!important;padding:0!important;
+  background:transparent!important;color:transparent!important;
+  display:grid;place-items:center;
+  transform:translate(-50%,-50%)!important;
+  pointer-events:none!important;
+}
+.career-app #toolSnapGuide .tool-snap-ring{
+  display:block;width:28px;height:28px;
+  border:2px dashed #ffe0a4;border-radius:50%;
+  background:#eed29818;
+  box-shadow:0 0 0 6px #f1bb612a,0 0 12px #dfa85d55;
+}
+.career-app #toolGrab{cursor:grab}
+.career-app #toolGrab.dragging{cursor:grabbing}
