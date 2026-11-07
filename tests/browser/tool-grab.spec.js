@@ -33,8 +33,10 @@ async function dragBody(page, fraction, pointerId = 60) {
 test("assisted mode is the default and magnetically aligns the real 3D instrument",async({page},info)=>{
   test.skip(info.project.name!=="iphone-portrait","Phone touch control acceptance");
   const errors = await enterLab(page);
-  await expect.poll(async() => (await page.evaluate(()=>window.redlineCareerDebug())).caliperAssetLoaded,
-    {timeout:15000}).toBe(true);
+  await expect.poll(async() => {
+    const diagnostic=await page.evaluate(()=>window.redlineCareerDebug());
+    return diagnostic.caliperAssetLoaded ? "LOADED" : diagnostic.assetLoadError || "LOADING";
+  }, {timeout:10000}).toBe("LOADED");
   const model = await page.evaluate(()=>window.redlineCareerDebug());
   expect(model.assetLoadError).toBeNull();
   expect(model.modelNodes).toContain("Sliding scale block");

@@ -27,6 +27,8 @@ jobs:
           GITHUB_PAGES: 'true'
       - name: Install headless Chromium
         run: npx playwright install chromium --only-shell
+      - name: Smoke-test vendored GLB on mobile browser
+        run: npx playwright test tests/browser/tool-grab.spec.js --project=iphone-portrait --grep "assisted mode is the default"
       - name: Check responsive gameplay before publishing
         run: npm run test:e2e
       - name: Archive visual QA screenshots
