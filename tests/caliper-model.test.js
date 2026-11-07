@@ -66,5 +66,5 @@ test("Three.js sanitized GLTF node names are resolved into functional rig parts"
   assert.equal(rig.moving.children.length,4);
   assert.ok(rig.thumb);
   rig.setOpening(130,200,1.96);
-  assert.ok(rig.moving.position.z>0);
+  assert.ok(rig.moving.position.z>SOURCE_JAW_OFFSET_M);
 });
