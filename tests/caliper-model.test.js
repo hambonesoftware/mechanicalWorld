@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import {
   MOVING_MESH_NAMES, SOURCE_JAW_OFFSET_M,
-  verifyCaliperParts, constructCaliperRig
+  verifyCaliperParts, findCaliperPart, constructCaliperRig
 } from "../src/career/caliper-model.js";
 
 function testModel() {
@@ -54,4 +54,17 @@ test("jaw travel scales by chosen inspected feature and clamps overreach",()=>{
   assert.equal(rig.moving.position.z,SOURCE_JAW_OFFSET_M);
   rig.setOpening(10_000,200,1.96);
   assert.ok(rig.moving.position.z<1);
+});
+
+test("Three.js sanitized GLTF node names are resolved into functional rig parts",()=>{
+  const gltf=testModel();
+  gltf.scene.traverse(node=>{
+    if(node.name) node.name=THREE.PropertyBinding.sanitizeNodeName(node.name);
+  });
+  assert.ok(findCaliperPart(gltf.scene,"Sliding scale block"));
+  const rig=constructCaliperRig(gltf);
+  assert.equal(rig.moving.children.length,4);
+  assert.ok(rig.thumb);
+  rig.setOpening(130,200,1.96);
+  assert.ok(rig.moving.position.z>0);
 });

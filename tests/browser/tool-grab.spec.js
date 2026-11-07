@@ -72,12 +72,12 @@ test("free grab requires placing the tool much closer before the jaws can engage
   await expect(page.locator("#handlingModeLabel")).toHaveText("A");
   await page.locator("#pickupTool").click();
   await page.locator("#zeroTool").click();
-  await dragBody(page,0.70,62);
+  await dragBody(page,0.50,62);
   let pose=await page.evaluate(()=>window.redlineCareerDebug());
   expect(pose.positioned).toBe(false);
-  expect(pose.placement).toBeGreaterThan(0.60);
+  expect(pose.placement).toBeGreaterThan(0.30);
   await expect(page.locator("#jawGrip")).toBeHidden();
-  await dragBody(page,0.28,63);
+  await dragBody(page,0.98,63);
   pose=await page.evaluate(()=>window.redlineCareerDebug());
   expect(pose.positioned).toBe(true);
   await expect(page.locator("#jawGrip")).toBeVisible();

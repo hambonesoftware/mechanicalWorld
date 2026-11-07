@@ -19,10 +19,17 @@ export const MOVING_MESH_NAMES = Object.freeze([
   "Slider thumb wheel"
 ]);
 
+// GLTFLoader sanitizes spaces, dots and colons for animation-track safety.
+// Resolve both the source Blender names and the names Three.js actually uses.
+export function findCaliperPart(scene, sourceName) {
+  return scene.getObjectByName(sourceName) ||
+    scene.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(sourceName));
+}
+
 export function verifyCaliperParts(scene) {
-  const missing = MOVING_MESH_NAMES.filter(name => !scene.getObjectByName(name));
+  const missing = MOVING_MESH_NAMES.filter(name => !findCaliperPart(scene,name));
   for (const fixed of ["Caliper beam", "Outside measuring jaw"]) {
-    if (!scene.getObjectByName(fixed)) missing.push(fixed);
+    if (!findCaliperPart(scene,fixed)) missing.push(fixed);
   }
   if (missing.length) throw new Error("GLB is missing caliper assembly nodes: " + missing.join(", "));
 }
@@ -47,9 +54,9 @@ export function constructCaliperRig(gltf) {
   gltf.scene.add(moving);
   gltf.scene.updateWorldMatrix(true, true);
   for (const name of MOVING_MESH_NAMES) {
-    moving.attach(gltf.scene.getObjectByName(name));
+    moving.attach(findCaliperPart(gltf.scene,name));
   }
-  const thumb = moving.getObjectByName("Slider thumb wheel");
+  const thumb = findCaliperPart(moving,"Slider thumb wheel");
   const bodyAnchor = new THREE.Object3D();
   bodyAnchor.position.set(0.004, 0.020, -0.008);
   origin.add(bodyAnchor);

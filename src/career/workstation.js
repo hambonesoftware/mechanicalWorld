@@ -119,7 +119,7 @@ function updatePlacement(progress) {
 }
 function finishPlacement() {
   if (!state.held || state.positioned) return;
-  const snapRadius = state.mode === "free" ? 0.23 : state.mode === "closeup" ? 0.53 : 0.75;
+  const snapRadius = state.mode === "free" ? 0.13 : state.mode === "closeup" ? 0.53 : 0.75;
   const result = placementResult(state.mode, state.placement);
   if (state.toolDistance <= snapRadius || (!Number.isFinite(state.toolDistance) && result.positioned)) {
     positionTool();
