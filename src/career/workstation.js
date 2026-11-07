@@ -136,7 +136,7 @@ function selectMode(mode) {
   state.scene?.setPlacement(0);
   $("handlingModeLabel").textContent =
     state.mode === "free" ? "A" : state.mode === "closeup" ? "C" : "B";
-  for (const button of $("[data-tool-mode]")) {
+  for (const button of $$("[data-tool-mode]")) {
     const selected = button.dataset.toolMode === state.mode;
     button.classList.toggle("selected", selected);
     button.setAttribute("aria-pressed", String(selected));
@@ -935,7 +935,7 @@ function connectControls(){
   $("openHandling").addEventListener("click",()=>showSheet("handling"));
   $("closeHandling").addEventListener("click",()=>showSheet(null));
   $("handlingDone").addEventListener("click",()=>showSheet(null));
-  for (const button of $("[data-tool-mode]")) {
+  for (const button of $$("[data-tool-mode]")) {
     button.addEventListener("click",()=>selectMode(button.dataset.toolMode));
   }
   $("cameraToggle").addEventListener("click",()=>{
