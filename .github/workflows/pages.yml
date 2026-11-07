@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
+      - name: Obtain CC0 caliper asset when not yet vendored
+        run: bash scripts/fetch-caliper.sh
       - run: npm test
       - run: npm run build
         env:

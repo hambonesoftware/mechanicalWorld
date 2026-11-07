@@ -18,6 +18,8 @@ jobs:
           node-version: '22'
       - name: Install pinned physics dependencies
         run: npm install --no-audit --no-fund
+      - name: Obtain CC0 caliper asset when not yet vendored
+        run: bash scripts/fetch-caliper.sh
       - name: Run engineering tests
         run: npm test
       - name: Build game
@@ -28,10 +30,10 @@ jobs:
         with:
           name: mechanical-world-build
           path: dist/
-      - name: Commit resolved dependency lockfile
+      - name: Commit verified dependency lockfile and licensed caliper asset
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          git add package-lock.json
+          git add package-lock.json public/models/vernier-caliper.glb
           if ! git diff --cached --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
