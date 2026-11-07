@@ -32,6 +32,14 @@ test("assisted mode is the default and magnetically aligns the real 3D instrumen
   const errors = await enterLab(page);
   await expect(page.locator("#handlingModeLabel")).toHaveText("B");
   await expect(page.locator("#jawGrip")).toBeHidden();
+  const sceneBounds=await page.locator("#workbench3d").boundingBox();
+  const toolBounds=await page.locator("#toolGrab").boundingBox();
+  const grabCenterX=toolBounds.x+toolBounds.width/2;
+  const grabCenterY=toolBounds.y+toolBounds.height/2;
+  expect(toolBounds.width).toBeGreaterThanOrEqual(44);
+  expect(grabCenterX).toBeGreaterThan(sceneBounds.x+sceneBounds.width*0.12);
+  expect(grabCenterX).toBeLessThan(sceneBounds.x+sceneBounds.width*0.88);
+  expect(grabCenterY).toBeLessThan(sceneBounds.y+sceneBounds.height*0.86);
   await page.locator("#pickupTool").click();
   const resting = await page.evaluate(()=>window.redlineCareerDebug());
   expect(resting.held).toBe(true);

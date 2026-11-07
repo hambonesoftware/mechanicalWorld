@@ -355,7 +355,7 @@ function createWorkshop(canvas) {
   scene.fog = new THREE.Fog(0x899b9d, 12, 28);
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 40);
   const target = new THREE.Vector3(-0.12, 1.85, 0.20);
-  const startOffset = new THREE.Vector3(3.15, 2.10, 8.10);
+  const startOffset = new THREE.Vector3(3.65, 2.45, 9.20);
   const spherical = new THREE.Spherical().setFromVector3(startOffset);
   let panMode = false;
   const pointers = new Map();
@@ -604,9 +604,11 @@ function createWorkshop(canvas) {
         ? new THREE.Vector3(0.05, 0.94, 1.58)
         : new THREE.Vector3(-0.45, 3.11, 1.58);
       return {
-        park: new THREE.Vector3(1.35, 0.98, 1.96),
+        park: new THREE.Vector3(1.12, 0.99, 1.75),
         engaged,
-        parkedRotation: -Math.PI / 2,
+        // Lay the rail toward the center of the bench rather than letting
+        // it and its grab target run out of the right side of the viewport.
+        parkedRotation: Math.PI / 2,
         engagedRotation: featureId === "height" ? 0 : -Math.PI / 2
       };
     }
