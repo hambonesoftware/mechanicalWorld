@@ -561,7 +561,7 @@ function createWorkshop(canvas) {
   // Import the complete original CC0 model, replacing the placeholder only
   // after all geometry and PBR materials have loaded. Keep fallback playable.
   loadCaliperRig().then(rig => {
-    if (disposed) return;
+    if (!running) return;
     caliperRig = rig;
     caliper.add(rig.root);
     for (const placeholder of placeholderParts) placeholder.visible = false;
