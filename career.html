@@ -45,6 +45,8 @@
         <button id="panMode" type="button" aria-label="Enable drag-to-pan" aria-pressed="false" title="Drag to pan">✥</button>
         <button id="resetView" type="button" aria-label="Reset camera view" title="Reset view">⟲</button>
       </div>
+      <button type="button" id="toolGrab" class="tool-grab" aria-label="Grab the measuring instrument from the bench"><span class="tool-grab-icon" aria-hidden="true">✋</span><span class="tool-grab-caption">GRAB</span></button>
+      <div class="tool-snap-guide" id="toolSnapGuide" hidden aria-hidden="true">ALIGN TO BEAM</div>
       <div id="jawGrip" class="jaw-grip" role="slider" aria-label="Slide the highlighted thumb wheel on the caliper" aria-valuemin="0" aria-valuemax="250" aria-valuenow="0" tabindex="0"><span id="gripSymbol">↕</span><small class="sr-only">Slide the tool jaw</small></div>
       <div class="contact-guide" id="contactGuide" aria-hidden="true"><span class="contact-guide-line"></span><span>SLIDE THE JAW</span></div>
       <div class="scene-feedback" id="sceneCorner">ZERO YOUR CALIPER TO BEGIN</div>
@@ -88,7 +90,9 @@
 
       <button type="button" id="fineToggle" class="fine-toggle" aria-controls="fineControls" aria-expanded="false" aria-label="Show precision jaw adjustment" title="Fine adjustment">⚙</button>
       <div class="action-row">
-        <button type="button" class="main-action" id="zeroTool">ZERO CALIPER <span>→</span></button>
+        <button type="button" class="main-action" id="pickupTool">PICK UP CALIPER <span>↗</span></button>
+        <button type="button" class="main-action" id="alignTool" hidden>ALIGN WITH PART <span>→</span></button>
+        <button type="button" class="main-action" id="zeroTool" hidden>ZERO CALIPER <span>→</span></button>
         <button type="button" class="main-action" id="seatJaws" hidden>TOUCH OFF PART <span>→</span></button>
         <button type="button" class="main-action" id="transferReading" hidden disabled>RECORD READING <span>✓</span></button>
       </div>
@@ -101,9 +105,27 @@
     <button type="button" id="openDrawing">Drawing</button>
     <div class="nav-separator"></div>
     <button type="button" id="openReport">Inspection <span class="count" id="reportCount">0/3</span></button>
+    <div class="nav-separator"></div>
+    <button type="button" id="openHandling">Handling <span id="handlingModeLabel" class="count">B</span></button>
   </nav>
 
   <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+
+  <section id="handlingSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="handlingTitle" hidden>
+    <header class="sheet-top"><span>REDLINE / TOOL-HANDLING TRIAL</span><button type="button" id="closeHandling" aria-label="Close tool-handling settings">✕</button></header>
+    <div class="sheet-scroll">
+      <span class="sheet-kicker">PLAYABLE CONTROL EXPERIMENT</span>
+      <h2 id="handlingTitle">How do you want to grab tools?</h2>
+      <p class="report-summary">All three modes use the same inspection measurements and career progress. Switch modes at any time to compare the feel of picking up and placing an instrument.</p>
+      <div class="handling-choices" role="group" aria-label="Tool interaction mode">
+        <button type="button" class="handling-choice" data-tool-mode="free" aria-pressed="false"><strong><span>A</span> Free grab</strong><small>Drag the tool all the way to the workpiece. Little assistance; more manual placement.</small></button>
+        <button type="button" class="handling-choice" data-tool-mode="assisted" aria-pressed="true"><strong><span>B</span> Assisted grab <em>RECOMMENDED</em></strong><small>Pick up the tool and drag toward the part. Gentle magnetic alignment helps seat it.</small></button>
+        <button type="button" class="handling-choice" data-tool-mode="closeup" aria-pressed="false"><strong><span>C</span> Close-up</strong><small>Grabbing moves the camera closer to the tool and part for precise placement.</small></button>
+      </div>
+      <p class="training-note">On iPhone: drag the small GRAB target on the tool body, not the camera. Once positioned, slide the moving jaw. A single accessible action button is available if direct dragging is difficult.</p>
+    </div>
+    <footer class="sheet-footer"><button type="button" class="main-action" id="handlingDone">TRY SELECTED MODE <span>→</span></button></footer>
+  </section>
 
   <section id="workOrderSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="workOrderTitle" hidden>
     <header class="sheet-top"><span>ENGINEERING DEPARTMENT · WO–001</span><button type="button" id="closeWorkOrder" aria-label="Close work order">✕</button></header>
@@ -113,7 +135,7 @@
       <div class="supervisor"><div class="supervisor-avatar">MR</div><p><strong>Mike Reynolds</strong><small>Shop supervisor</small></p></div>
       <blockquote id="mentorText">“Morning, rookie. Before this beam goes anywhere near the test rig, check its three dimensions. One bad measurement can stop an expensive mistake.”</blockquote>
       <div class="order-summary"><span>YOUR OBJECTIVE</span><strong>Measure all three dimensions and decide: ACCEPT or REJECT.</strong></div>
-      <div class="mini-steps"><div><b>01</b><span>Zero your instrument.</span></div><div><b>02</b><span>Drag the jaws to the part and take a reading.</span></div><div><b>03</b><span>Record measurements and sign the inspection.</span></div></div>
+      <div class="mini-steps"><div><b>01</b><span>Pick up the caliper from the workbench and zero it.</span></div><div><b>02</b><span>Move it into position on the beam; then slide the moving jaw until contact.</span></div><div><b>03</b><span>Record your readings and sign the inspection report.</span></div></div>
       <p class="training-note">Training specimen · Digital measurements are simulated. The drawing represents nominal dimensions and tolerances.</p>
     </div>
     <footer class="sheet-footer"><button type="button" id="goBench" class="main-action">START MEASURING <span>→</span></button></footer>

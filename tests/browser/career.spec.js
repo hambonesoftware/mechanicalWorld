@@ -9,7 +9,8 @@ async function openWorkstation(page) {
   await page.locator("#goBench").click();
   await expect(page.locator("#workOrderSheet")).toBeHidden();
   await expect(page.locator("#workbench3d")).toBeVisible();
-  await expect(page.locator("#jawGrip")).toBeVisible();
+  await expect(page.locator("#toolGrab")).toBeVisible();
+  await expect(page.locator("#jawGrip")).toBeHidden();
   return errors;
 }
 
@@ -22,7 +23,9 @@ async function setJaw(page, opening){
 
 async function measure(page,feature,opening,zero){
   await page.locator('[data-feature="'+feature+'"]').click();
+  await page.locator("#pickupTool").click();
   if(zero)await page.locator("#zeroTool").click();
+  await page.locator("#alignTool").click();
   await setJaw(page,opening);
   await page.locator("#seatJaws").click();
   await expect(page.locator("#meterState")).toHaveText("CONTACT ✓");
@@ -40,7 +43,7 @@ test("career starts with a single short work order and a direct Start Measuring 
   await page.locator("#goBench").click();
   await expect(page.locator("#workOrderSheet")).toBeHidden();
   await expect(page.locator(".work-controls")).toBeVisible();
-  await expect(page.locator("#zeroTool")).toBeVisible();
+  await expect(page.locator("#pickupTool")).toBeVisible();
   await expect(page.locator("#workbench3d")).toBeVisible();
   await page.screenshot({path:"test-results/"+info.project.name+"-career-bench.png"});
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
@@ -114,9 +117,20 @@ test("direct caliper dragging produces a real recorded height reading",async({pa
   await page.locator("#panMode").click();
   await page.locator("#cameraToggle").click();
 
+  await page.locator("#pickupTool").click();
   await page.locator("#zeroTool").click();
   await expect(page.locator("#zeroTool")).toBeHidden();
-  await expect(page.locator("#seatJaws")).toBeVisible();
+  await expect(page.locator("#alignTool")).toBeVisible();
+  const grab=page.locator("#toolGrab");
+  const grabRect=await grab.boundingBox();
+  const bx=grabRect.x+grabRect.width/2;
+  const by=grabRect.y+grabRect.height/2;
+  const placeDistance=Math.max(125,Math.min(230,rect.width*0.64))*0.79;
+  await grab.dispatchEvent("pointerdown",{pointerId:37,pointerType:"touch",clientX:bx,clientY:by});
+  await grab.dispatchEvent("pointermove",{pointerId:37,pointerType:"touch",clientX:bx-placeDistance,clientY:by});
+  await grab.dispatchEvent("pointerup",{pointerId:37,pointerType:"touch",clientX:bx-placeDistance,clientY:by});
+  await expect(page.locator("#jawGrip")).toBeVisible();
+  await expect(page.locator("#alignTool")).toBeHidden();
   // The in-world help stays visible after zeroing, until the first real
   // interaction with the instrument, rather than disappearing too early.
   await expect(page.locator("#contactGuide")).toBeVisible();
@@ -150,7 +164,9 @@ test("direct caliper dragging produces a real recorded height reading",async({pa
 test("career work order teaches instruments, checks tolerance and awards XP",async({page},info)=>{
   test.skip(info.project.name!=="iphone-portrait","Representative phone career end-to-end test");
   const errors=await openWorkstation(page);
+  await page.locator("#pickupTool").click();
   await page.locator("#zeroTool").click();
+  await page.locator("#alignTool").click();
   await setJaw(page,200);
   await page.locator("#seatJaws").click();
   await expect(page.locator("#meterReading")).toHaveText("200.18");
@@ -159,7 +175,9 @@ test("career work order teaches instruments, checks tolerance and awards XP",asy
   await measure(page,"flange",120,false);
   await expect(page.locator("#taskTitle")).toContainText("web");
   await expect(page.locator("#meterName")).toHaveText("MICROMETER");
+  await page.locator("#pickupTool").click();
   await page.locator("#zeroTool").click();
+  await page.locator("#alignTool").click();
   await setJaw(page,8);
   await page.locator("#seatJaws").click();
   await expect(page.locator("#meterReading")).toHaveText("8.32");
@@ -200,6 +218,12 @@ test("tablet and landscape layouts keep the lab fullscreen and the controls cont
   expect(controls.width).toBeLessThan(viewport.width+2);
   await expect(page.locator("#cameraToggle")).toBeVisible();
   await expect(page.locator("#fineControls")).toBeHidden();
+  const grab=await page.locator("#toolGrab").boundingBox();
+  expect(grab.width).toBeGreaterThanOrEqual(44);
+  expect(grab.width).toBeLessThanOrEqual(55);
+  await page.locator("#pickupTool").click();
+  await page.locator("#zeroTool").click();
+  await page.locator("#alignTool").click();
   const grip=await page.locator("#jawGrip").boundingBox();
   expect(grip.width).toBeLessThanOrEqual(50);
   expect(grip.height).toBeLessThanOrEqual(50);

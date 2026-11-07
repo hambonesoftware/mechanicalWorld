@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {
   FEATURES, canSeat, assessInspection, readCareer, careerRank, completeWorkOrder
 } from "./inspection.js";
+import { TOOL_MODES, readToolMode, saveToolMode, placementResult, travelFromDrag, toolAction } from "./tool-grab.js";
 
 const $ = id => document.getElementById(id);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -16,7 +17,11 @@ const state = {
   captured: new Set(),
   sheet: null,
   scene: null,
-  firstInteraction: false
+  firstInteraction: false,
+  mode: readToolMode(store),
+  held: false,
+  positioned: false,
+  placement: 0
 };
 
 const dimensionLabels = {
@@ -38,7 +43,7 @@ function updateCareerHeader() {
 
 function showSheet(name = null) {
   state.sheet = name;
-  for (const sheet of ["workOrder", "drawing", "report"]) {
+  for (const sheet of ["workOrder", "drawing", "report", "handling"]) {
     $(sheet + "Sheet").hidden = sheet !== name;
   }
   $("sheetBackdrop").hidden = !name;
@@ -56,6 +61,89 @@ function feedback(text, tone = "") {
   $("sceneCorner").className = "scene-feedback " + tone;
 }
 
+
+function contactFeedback() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      const audio = window.__redlineSoundContext || (window.__redlineSoundContext = new AudioContextClass());
+      if (audio.state === "suspended") audio.resume().catch(() => {});
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(950, audio.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(490, audio.currentTime + 0.045);
+      gain.gain.setValueAtTime(0.022, audio.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.065);
+      oscillator.connect(gain).connect(audio.destination);
+      oscillator.start();
+      oscillator.stop(audio.currentTime + 0.067);
+    }
+  } catch { /* Audio may be blocked; never stop the game. */ }
+}
+function pickUpTool() {
+  if (state.held) return;
+  state.held = true;
+  state.positioned = false;
+  state.placement = 0;
+  state.scene?.setPlacement(0.10);
+  if (TOOL_MODES[state.mode].closeup) state.scene?.focusTool();
+  renderControlState();
+  feedback("Tool in hand. Set zero, then drag the GRAB point toward the beam.", "good");
+}
+function positionTool(announce = true) {
+  if (!state.held) pickUpTool();
+  if (!state.zeroed[state.tool]) {
+    feedback("Zero the instrument before placing the jaws.", "warning");
+    return false;
+  }
+  state.placement = 1;
+  state.positioned = true;
+  state.scene?.setPlacement(1);
+  if (TOOL_MODES[state.mode].closeup) state.scene?.focusTool();
+  renderControlState();
+  if (announce) feedback("Jaws aligned. Slide the moving jaw to make contact.", "good");
+  contactFeedback();
+  return true;
+}
+function updatePlacement(progress) {
+  if (!state.held || state.positioned || !state.zeroed[state.tool]) return;
+  state.placement = progress;
+  state.scene?.setPlacement(progress);
+  $("toolSnapGuide").hidden = progress < 0.3;
+  if (progress > 0.2) feedback("Aligning tool with the workpiece…", "good");
+}
+function finishPlacement() {
+  if (!state.held || state.positioned) return;
+  const result = placementResult(state.mode, state.placement);
+  if (result.positioned) {
+    positionTool();
+  } else {
+    feedback(state.mode === "free"
+      ? "Move the tool closer to the measurement faces. Free mode has no magnetic snap."
+      : "Move the tool toward the highlighted part until it seats.", "warning");
+    state.scene?.setPlacement(state.placement);
+  }
+}
+function selectMode(mode) {
+  state.mode = saveToolMode(store, mode);
+  state.held = false;
+  state.positioned = false;
+  state.placement = 0;
+  state.opening = 0;
+  state.reading = null;
+  state.scene?.resetView();
+  state.scene?.setPlacement(0);
+  $("handlingModeLabel").textContent =
+    state.mode === "free" ? "A" : state.mode === "closeup" ? "C" : "B";
+  for (const button of $("[data-tool-mode]")) {
+    const selected = button.dataset.toolMode === state.mode;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+  renderControlState();
+  feedback(TOOL_MODES[state.mode].name + " selected. Pick up the instrument to begin.");
+}
 function setOpening(value) {
   const max = state.feature.maxOpening;
   state.opening = Math.min(max, Math.max(0, Math.round(Number(value) * 100) / 100));
@@ -68,30 +156,36 @@ function selectFeature(id) {
   if (!feature) return;
   state.feature = feature;
   state.tool = feature.tool;
+  state.held = false;
+  state.positioned = false;
+  state.placement = 0;
   state.opening = 0;
   state.reading = null;
   renderControlState();
   state.scene?.setFeature(id);
   state.scene?.setTool(state.tool);
+  state.scene?.setPlacement(0);
   state.scene?.resetView();
-  feedback(state.zeroed[state.tool]
-    ? "Drag the orange jaw to " + feature.nominal + " mm, then release."
-    : "Zero the " + (state.tool === "caliper" ? "caliper" : "micrometer") + " to begin.");
+  feedback("Pick up the " + (state.tool === "caliper" ? "caliper" : "micrometer") + " from the bench.");
 }
 
 function switchTool() {
   state.tool = state.tool === "caliper" ? "micrometer" : "caliper";
+  state.held = false;
+  state.positioned = false;
+  state.placement = 0;
   state.opening = 0;
   state.reading = null;
   state.scene?.setTool(state.tool);
+  state.scene?.setPlacement(0);
   renderControlState();
   feedback(state.tool !== state.feature.tool
-    ? "That tool cannot measure this feature. Tap the tool name to change back."
-    : state.zeroed[state.tool] ? "Drag the orange jaw toward the part." : "Close the jaws, then zero the instrument.",
-    state.tool !== state.feature.tool ? "warning" : "");
+    ? "Wrong instrument for this dimension. Choose the other tool."
+    : "Pick up the tool from the bench.", state.tool !== state.feature.tool ? "warning" : "");
 }
 
 function zeroTool() {
+  if (!state.held) { feedback("Pick up the instrument first.", "warning"); return; }
   if (state.tool !== state.feature.tool) {
     feedback("This feature needs the " + (state.feature.tool === "caliper" ? "caliper" : "micrometer") + ".", "warning");
     return;
@@ -105,10 +199,11 @@ function zeroTool() {
   state.opening = 0;
   state.reading = null;
   renderControlState();
-  feedback("Zero set. Drag the orange jaw to " + state.feature.nominal + " mm.", "good");
+  feedback("Zero set. Drag the GRAB point to bring the caliper onto the part.", "good");
 }
 
 function seatJaws() {
+  if (!state.positioned) { feedback("Position the tool against the workpiece first.", "warning"); return false; }
   if (state.tool !== state.feature.tool) {
     feedback("Wrong instrument. Change tools first.", "warning");
     return false;
@@ -125,6 +220,7 @@ function seatJaws() {
   state.reading = state.feature.actual;
   renderControlState();
   feedback("Contact ✓ " + state.reading.toFixed(2) + " mm. Record the reading.", "good");
+  contactFeedback();
   return true;
 }
 
@@ -168,13 +264,26 @@ function renderControlState() {
   $("toolIcon").textContent = state.tool === "caliper" ? "▤" : "◉";
   $("toolHint").textContent = ready ? "Tap to change tool" : "WRONG TOOL — TAP TO SWITCH";
   $("toolPicker").classList.toggle("wrong-tool", !ready);
-  $("zeroTool").hidden = calibrated;
-  $("seatJaws").hidden = !calibrated || state.reading !== null;
-  $("transferReading").hidden = state.reading === null;
+  const phase = toolAction({
+    held: state.held, positioned: state.positioned,
+    zeroed: calibrated, reading: state.reading
+  });
+  $("pickupTool").hidden = phase !== "pickup";
+  $("zeroTool").hidden = phase !== "zero";
+  $("alignTool").hidden = phase !== "position";
+  $("seatJaws").hidden = phase !== "touch";
+  $("transferReading").hidden = phase !== "record";
+  $("toolGrab").hidden = state.positioned;
+  $("jawGrip").hidden = !state.positioned || !calibrated;
+  $("contactGuide").hidden = !state.positioned || state.reading !== null || state.firstInteraction;
+  $("toolGrab").setAttribute("aria-label", state.held
+    ? "Drag the tool body toward the beam to align the jaws"
+    : "Grab the " + state.tool + " from the bench");
+  $("toolGrab").querySelector(".tool-grab-caption").textContent = state.held ? "MOVE" : "GRAB";
+  $("toolSnapGuide").hidden = !state.held || state.positioned || state.placement < 0.28;
   $("transferReading").disabled = state.reading === null;
   $("transferReading").innerHTML = "RECORD " + (state.reading === null ? "READING" : state.reading.toFixed(2) + " mm") + " <span>✓</span>";
   $("zeroTool").textContent = "ZERO " + (state.tool === "caliper" ? "CALIPER" : "MICROMETER") + " →";
-  $("contactGuide").hidden = state.reading!==null || state.firstInteraction;
   $("sceneCorner").classList.toggle("quiet",state.reading===null && calibrated);
   $("reportCount").textContent = state.captured.size + "/3";
   for (const button of $$("[data-feature]")) {
@@ -253,6 +362,7 @@ function createWorkshop(canvas) {
   let lastGesture = null;
   let tap = null;
   let gripPointer = null;
+  let toolPointer = null;
   let renderNeeded = true;
 
   function updateCamera() {
@@ -488,65 +598,108 @@ function createWorkshop(canvas) {
     renderNeeded=true;
   }
 
-  function setFeature(id) {
-    if(id==="height"){
-      caliper.visible=state.tool==="caliper";
-      caliper.position.set(0.05,0.94,1.58);
-      caliper.rotation.z=0;
-    } else if(id==="flange"){
-      caliper.visible=state.tool==="caliper";
-      caliper.position.set(-0.45,3.11,1.58);
-      caliper.rotation.z=-Math.PI/2;
-    } else {
-      caliper.visible=false;
+  function toolPose(tool, featureId) {
+    if (tool === "caliper") {
+      const engaged = featureId === "height"
+        ? new THREE.Vector3(0.05, 0.94, 1.58)
+        : new THREE.Vector3(-0.45, 3.11, 1.58);
+      return {
+        park: new THREE.Vector3(1.35, 0.98, 1.96),
+        engaged,
+        parkedRotation: -Math.PI / 2,
+        engagedRotation: featureId === "height" ? 0 : -Math.PI / 2
+      };
     }
-    micro.visible=state.tool==="micrometer";
+    return {
+      park: new THREE.Vector3(1.35, 1.28, 1.95),
+      engaged: new THREE.Vector3(0.18, 1.85, 1.30),
+      parkedRotation: -0.25,
+      engagedRotation: 0
+    };
+  }
+
+  function setPlacement(progress) {
+    const t = THREE.MathUtils.clamp(progress, 0, 1);
+    const pose = toolPose(state.tool, state.feature.id);
+    const object = state.tool === "caliper" ? caliper : micro;
+    object.position.copy(pose.park).lerp(pose.engaged, t);
+    // Free grab, assisted grab and inspection close-up all move the real
+    // group through one constrained workspace. The modes change *when*
+    // the instrument magnetically settles, not where it ends up.
+    object.rotation.z = THREE.MathUtils.lerp(pose.parkedRotation, pose.engagedRotation, t);
+    object.rotation.y = 0;
+    renderNeeded = true;
+    updateGrip();
+  }
+
+  function setFeature(id) {
+    caliper.visible = state.tool === "caliper";
+    micro.visible = state.tool === "micrometer";
     drawDimensions(id);
+    setPlacement(state.placement);
     setOpeningVisual(state.opening);
     updateCamera();
   }
 
   function setTool(tool) {
-    caliper.visible = tool==="caliper";
-    micro.visible = tool==="micrometer";
-    if(tool==="caliper"){
-      caliper.position.set(state.feature.id==="height"?0.05:-0.45,
-        state.feature.id==="height"?0.94:3.11,1.58);
-      caliper.rotation.z=state.feature.id==="height"?0:-Math.PI/2;
-    }
-    renderNeeded=true;
+    caliper.visible = tool === "caliper";
+    micro.visible = tool === "micrometer";
+    setPlacement(state.placement);
+    renderNeeded = true;
     updateGrip();
   }
 
   function setOpeningVisual(mm) {
-    if (state.tool==="caliper") {
-      const ratio=mm/Math.max(1,state.feature.nominal);
-      const worldTravel=state.feature.id==="height"?1.96:1.72;
-      caliperSlider.position.y=Math.min(2.30,Math.max(0,ratio*worldTravel));
+    if (state.tool === "caliper") {
+      const ratio = mm / Math.max(1, state.feature.nominal);
+      const travel = state.feature.id === "height" ? 1.96 : 1.72;
+      caliperSlider.position.y = Math.min(2.3, Math.max(0, ratio * travel));
     } else {
-      micSlider.position.x=Math.min(0.40,Math.max(0,mm/Math.max(1,state.feature.nominal)*0.28));
+      micSlider.position.x = Math.min(0.4, Math.max(0, mm / Math.max(1, state.feature.nominal) * 0.28));
     }
-    renderNeeded=true;
+    renderNeeded = true;
     updateGrip();
   }
 
   function updateGrip() {
-    if(canvas.clientHeight<2||canvas.clientWidth<2) return;
-    const group=state.tool==="caliper"?caliperSlider:micSlider;
-    group.updateWorldMatrix(true,false);
-    const marker=state.tool==="caliper"
-      ?new THREE.Vector3(-0.49,0.08,0.22)
-      :new THREE.Vector3(0.26,0.04,0.28);
-    const point=group.localToWorld(marker).project(camera);
-    const width=canvas.clientWidth,height=canvas.clientHeight;
-    if(!Number.isFinite(point.x)||!Number.isFinite(point.y)) return;
-    const x=THREE.MathUtils.clamp((point.x+1)*width/2,27,width-27);
-    const y=THREE.MathUtils.clamp((1-point.y)*height/2,120,height-130);
-    const grip=$("jawGrip");
-    grip.style.left=x+"px";
-    grip.style.top=y+"px";
-    $("contactGuide").style.left=THREE.MathUtils.clamp(x,70,width-70)+"px";
-    $("contactGuide").style.top=(y-43)+"px";
+    if (canvas.clientHeight < 2 || canvas.clientWidth < 2) return;
+    const width = canvas.clientWidth, height = canvas.clientHeight;
+    const coordinate = (group, local) => {
+      group.updateWorldMatrix(true, false);
+      const clip = group.localToWorld(local.clone()).project(camera);
+      return {
+        x: THREE.MathUtils.clamp((clip.x + 1) * width / 2, 28, width - 28),
+        y: THREE.MathUtils.clamp((1 - clip.y) * height / 2, 146, height - 160)
+      };
+    };
+    const sliderGroup = state.tool === "caliper" ? caliperSlider : micSlider;
+    const sliderPoint = coordinate(sliderGroup, state.tool === "caliper"
+      ? new THREE.Vector3(-0.49, 0.08, 0.22)
+      : new THREE.Vector3(0.26, 0.04, 0.28));
+    const grip = $("jawGrip");
+    grip.style.left = sliderPoint.x + "px";
+    grip.style.top = sliderPoint.y + "px";
+    $("contactGuide").style.left = THREE.MathUtils.clamp(sliderPoint.x, 70, width - 70) + "px";
+    $("contactGuide").style.top = (sliderPoint.y - 43) + "px";
+
+    // 44+ CSS-pixel grab target follows the *instrument body*, not the
+    // moving jaw. The tool itself is also raycastable on the canvas.
+    const toolGroup = state.tool === "caliper" ? caliper : micro;
+    const grabPoint = coordinate(toolGroup, state.tool === "caliper"
+      ? new THREE.Vector3(-0.26, 1.07, 0.19)
+      : new THREE.Vector3(0.40, 0, 0.25));
+    $("toolGrab").style.left = grabPoint.x + "px";
+    $("toolGrab").style.top = grabPoint.y + "px";
+    $("toolSnapGuide").style.left = THREE.MathUtils.clamp(grabPoint.x, 70, width - 70) + "px";
+    $("toolSnapGuide").style.top = (grabPoint.y - 49) + "px";
+  }
+
+  function focusTool() {
+    target.set(0.05, 1.86, 1.18);
+    spherical.radius = 5.65;
+    spherical.theta = 0.30;
+    spherical.phi = 1.20;
+    updateCamera();
   }
 
   // Tap the part to select its feature; all 3 features are also available
@@ -571,15 +724,70 @@ function createWorkshop(canvas) {
     const a=pts[0],b=pts[1];
     return{x:(a.x+b.x)/2,y:(a.y+b.y)/2,distance:Math.max(6,Math.hypot(a.x-b.x,a.y-b.y))};
   }
+  function hitInstrument(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    ndc.set(((clientX - rect.left) / rect.width) * 2 - 1,
+      1 - ((clientY - rect.top) / rect.height) * 2);
+    raycaster.setFromCamera(ndc, camera);
+    return raycaster.intersectObject(state.tool === "caliper" ? caliper : micro, true).length > 0;
+  }
+  function startToolDrag(event, source) {
+    if (state.positioned) return false;
+    if (!state.held) pickUpTool();
+    toolPointer = {
+      id: event.pointerId, startX: event.clientX,
+      progress: state.placement, source, moved: false
+    };
+    if (source === "handle") $("toolGrab").classList.add("dragging");
+    return true;
+  }
+  function moveToolDrag(event) {
+    if (!toolPointer || toolPointer.id !== event.pointerId) return false;
+    event.preventDefault();
+    const dx = toolPointer.startX - event.clientX;
+    if (Math.abs(dx) > 4) toolPointer.moved = true;
+    if (state.zeroed[state.tool] && state.tool === state.feature.tool) {
+      const span = Math.max(125, Math.min(230, canvas.clientWidth * 0.64));
+      updatePlacement(travelFromDrag(toolPointer.progress, dx, span));
+    }
+    return true;
+  }
+  function endToolDrag(event) {
+    if (!toolPointer || toolPointer.id !== event.pointerId) return false;
+    const moved = toolPointer.moved;
+    toolPointer = null;
+    $("toolGrab").classList.remove("dragging");
+    if (moved && state.zeroed[state.tool]) finishPlacement();
+    return true;
+  }
+  const grabButton = $("toolGrab");
+  grabButton.addEventListener("pointerdown", event => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    startToolDrag(event, "handle");
+    try { grabButton.setPointerCapture(event.pointerId); } catch { /* test event */ }
+  });
+  grabButton.addEventListener("pointermove", moveToolDrag);
+  grabButton.addEventListener("pointerup", endToolDrag);
+  grabButton.addEventListener("pointercancel", endToolDrag);
+  grabButton.addEventListener("click", event => {
+    if (event.detail === 0) pickUpTool();
+  });
   canvas.addEventListener("pointerdown",event=>{
     if(event.pointerType==="mouse"&&event.button!==0) return;
     event.preventDefault();
     try{canvas.setPointerCapture(event.pointerId);}catch{ /* test synthetic input */ }
+    if (!state.positioned && hitInstrument(event.clientX, event.clientY)) {
+      startToolDrag(event, "canvas");
+      return;
+    }
     pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     tap=pointers.size===1?{id:event.pointerId,x:event.clientX,y:event.clientY,moved:false}:null;
     lastGesture=getGesture();
   });
   canvas.addEventListener("pointermove",event=>{
+    if (moveToolDrag(event)) return;
     const prev=pointers.get(event.pointerId);
     if(!prev) return;
     event.preventDefault();
@@ -598,6 +806,7 @@ function createWorkshop(canvas) {
     lastGesture=two;
   });
   function pointerEnd(event){
+    if (endToolDrag(event)) return;
     if(tap&&tap.id===event.pointerId&&!tap.moved&&
       Math.hypot(event.clientX-tap.x,event.clientY-tap.y)<9)tapObject(event.clientX,event.clientY);
     tap=null;
@@ -614,6 +823,7 @@ function createWorkshop(canvas) {
 
   const grip=$("jawGrip");
   grip.addEventListener("pointerdown",event=>{
+    if (!state.positioned || !state.zeroed[state.tool]) return;
     if(event.pointerType==="mouse"&&event.button!==0)return;
     event.preventDefault();event.stopPropagation();
     gripPointer={id:event.pointerId,x:event.clientX,y:event.clientY,opening:state.opening,moved:false};
@@ -687,14 +897,16 @@ function createWorkshop(canvas) {
     renderer.dispose();
   },{once:true});
   return{
-    resize,setFeature,setTool,setOpening:setOpeningVisual,
+    resize,setFeature,setTool,setOpening:setOpeningVisual,setPlacement,focusTool,
     zoom(factor){spherical.radius*=factor;updateCamera();},
     resetView,updateGrip,
     setPan(enabled){panMode=enabled;},
     debug(){return{
       radius:spherical.radius,theta:spherical.theta,phi:spherical.phi,
       target:target.toArray(),opening:state.opening,panMode,
-      feature:state.feature.id,tool:state.tool
+      feature:state.feature.id,tool:state.tool,
+      held:state.held,positioned:state.positioned,placement:state.placement,mode:state.mode,
+      toolPosition:(state.tool==="caliper"?caliper:micro).position.toArray()
     };}
   };
 }
@@ -718,6 +930,14 @@ function connectControls(){
     button.addEventListener("click",()=>selectFeature(button.dataset.feature));
   }
   $("toolPicker").addEventListener("click",switchTool);
+  $("pickupTool").addEventListener("click",pickUpTool);
+  $("alignTool").addEventListener("click",()=>positionTool());
+  $("openHandling").addEventListener("click",()=>showSheet("handling"));
+  $("closeHandling").addEventListener("click",()=>showSheet(null));
+  $("handlingDone").addEventListener("click",()=>showSheet(null));
+  for (const button of $("[data-tool-mode]")) {
+    button.addEventListener("click",()=>selectMode(button.dataset.toolMode));
+  }
   $("cameraToggle").addEventListener("click",()=>{
     const open=$("sceneCameraTools").hidden;
     $("sceneCameraTools").hidden=!open;
@@ -762,6 +982,7 @@ function main(){
   connectControls();
   updateCareerHeader();
   renderControlState();
+  selectMode(state.mode);
   try{
     state.scene=createWorkshop($("workbench3d"));
     state.scene.setFeature(state.feature.id);

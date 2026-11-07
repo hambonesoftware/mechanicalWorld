@@ -643,3 +643,25 @@ button:disabled{cursor:not-allowed;opacity:.45}
 /* Vector camera control instead of an unsupported font glyph. */
 .career-app .camera-toggle svg{width:23px;height:23px;display:block}
 .career-app .bottom-nav button{padding:0 7px}
+
+/* REDLINE grab/position tool study. Real instrument stays visible. */
+.career-app #toolGrab{position:absolute;z-index:9;width:49px;height:49px;min-width:49px;min-height:49px;padding:0;transform:translate(-50%,-50%);border:2px solid #f5d19ebf;border-radius:50%;background:radial-gradient(circle,#233c3ca9,#142a2bcc);color:#ffe2b4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;cursor:grab;user-select:none;box-shadow:0 0 0 5px #f4c7801a,0 3px 11px #0005}
+.career-app #toolGrab .tool-grab-icon{font-size:19px;line-height:22px}
+.career-app #toolGrab .tool-grab-caption{font-size:8px;font-weight:900;line-height:12px;letter-spacing:.65px}
+.career-app #toolGrab.dragging{background:#ffd18e;color:#203332;box-shadow:0 0 0 7px #f4c78044,0 3px 10px #0005}
+.career-app #toolGrab[hidden],.career-app #jawGrip[hidden],.career-app #toolSnapGuide[hidden]{display:none!important}
+.career-app .work-scene #toolGrab{pointer-events:auto!important}
+.career-app .tool-snap-guide{position:absolute;z-index:8;pointer-events:none;transform:translate(-50%,-50%);background:#243936e6;border:1px solid #edc487b0;border-radius:5px;color:#ffe2b0;font-size:9px;letter-spacing:.6px;font-weight:900;padding:5px 8px;white-space:nowrap}
+.career-app #jawGrip{z-index:10;width:47px!important;height:47px!important;background:radial-gradient(circle,#f1d196d9,#ae8b54b9)!important}
+.career-app .bottom-nav{max-width:min(66%,310px)!important}
+.career-app .bottom-nav button{font-size:10px;gap:3px;white-space:nowrap}
+.career-app .bottom-nav button:last-child{color:#f7cf94}
+.career-app .handling-choices{display:grid;gap:9px;margin:15px 0}
+.career-app .handling-choice{width:100%;min-height:85px;border:1px solid #c4d1cf;border-radius:11px;background:#fff;color:#283b3f;text-align:left;padding:12px}
+.career-app .handling-choice.selected{border:2px solid #cb985b;padding:11px;background:#f9efdd}
+.career-app .handling-choice strong{display:flex;align-items:center;gap:9px;font-size:14px}
+.career-app .handling-choice strong span{display:grid;place-items:center;flex:none;background:#2c4447;color:#ffe1ad;border-radius:7px;width:29px;height:29px;font-size:16px}
+.career-app .handling-choice em{color:#986427;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.5px}
+.career-app .handling-choice small{display:block;margin:7px 0 0 38px;font-size:11px;line-height:1.5;color:#657777}
+@media(max-width:500px){.career-app .bottom-nav{max-width:min(72%,285px)!important;right:6px}.career-app .bottom-nav button{font-size:9px;padding:0 4px}.career-app .bottom-nav .count{font-size:8px}}
+@media(max-height:540px) and (orientation:landscape){.career-app .bottom-nav{max-width:calc(100% - 170px)!important}.career-app .bottom-nav button{font-size:9px}}
